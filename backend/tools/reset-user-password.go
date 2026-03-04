@@ -108,8 +108,8 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Println("✅ Password berhasil diubah!")
-	fmt.Println("✅ Semua refresh token dihapus (user harus login ulang)")
+	fmt.Println("Password berhasil diubah!")
+	fmt.Println("Semua refresh token dihapus (user harus login ulang)")
 	fmt.Println()
 	fmt.Printf("User '%s' sekarang bisa login dengan password baru.\n", email)
 }

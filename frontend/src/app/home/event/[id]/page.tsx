@@ -80,8 +80,8 @@ export default function EventDetailPage() {
 
       {/* Thumbnail */}
       {event.thumbnail && (
-        <div className="w-full h-48 rounded-xl overflow-hidden mb-6">
-          <img src={event.thumbnail} alt={event.title} className="w-full h-full object-cover" />
+        <div className="w-full rounded-xl overflow-hidden mb-6 bg-gray-100">
+          <img src={event.thumbnail} alt={event.title} className="w-full h-auto object-contain" />
         </div>
       )}
 

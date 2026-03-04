@@ -23,7 +23,7 @@ func main() {
 	fmt.Printf("From: %s\n\n", from)
 
 	if apiKey == "" {
-		log.Fatal("❌ RESEND_API_KEY not set in .env file")
+		log.Fatal(" RESEND_API_KEY not set in .env file")
 	}
 
 	// Prompt for recipient email
@@ -45,20 +45,20 @@ func main() {
 		From:    from,
 		To:      []string{toEmail},
 		Subject: "Test Email - Portal Alumni Al Bahjah",
-		Html:    `<h1>Assalamualaikum!</h1><p>Ini adalah test email dari Portal Alumni Al Bahjah.</p><p>Jika Anda menerima email ini, berarti konfigurasi Resend sudah benar! ✅</p><p><strong>Wassalamualaikum,</strong><br>Tim Portal Alumni Al Bahjah</p>`,
+		Html:    `<h1>Assalamualaikum!</h1><p>Ini adalah test email dari Portal Alumni Al Bahjah.</p><p>Jika Anda menerima email ini, berarti konfigurasi Resend sudah benar!</p><p><strong>Wassalamualaikum,</strong><br>Tim Portal Alumni Al Bahjah</p>`,
 		Text:    "Assalamualaikum!\n\nIni adalah test email dari Portal Alumni Al Bahjah.\n\nJika Anda menerima email ini, berarti konfigurasi Resend sudah benar!\n\nWassalamualaikum,\nTim Portal Alumni Al Bahjah",
 	}
 
 	// Send email
 	sent, err := client.Emails.Send(params)
 	if err != nil {
-		log.Fatalf("❌ Failed to send email: %v\n", err)
+		log.Fatalf("Failed to send email: %v\n", err)
 	}
 
-	fmt.Println("✅ Email sent successfully!")
+	fmt.Println("Email sent successfully!")
 	fmt.Printf("Email ID: %s\n", sent.Id)
 	fmt.Println("\nPlease check your inbox (and spam folder) for the test email.")
-	fmt.Println("\n💡 Tips:")
+	fmt.Println("\n Tips:")
 	fmt.Println("- If using onboarding@resend.dev, make sure the recipient email is added in Resend dashboard")
 	fmt.Println("- Check Resend dashboard logs: https://resend.com/emails")
 }

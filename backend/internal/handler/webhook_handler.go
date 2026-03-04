@@ -92,7 +92,7 @@ func (h *WebhookHandler) handleEmailSent(event ResendWebhookEvent) {
 	to := getStringFromData(event.Data, "to")
 	subject := getStringFromData(event.Data, "subject")
 	
-	log.Printf("✅ Email sent - ID: %s, To: %s, Subject: %s", emailID, to, subject)
+	log.Printf(" Email sent - ID: %s, To: %s, Subject: %s", emailID, to, subject)
 	
 	// TODO: Update database status jika perlu
 	// Misalnya: update email_logs table dengan status "sent"

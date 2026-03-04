@@ -30,6 +30,7 @@ export interface News {
   thumbnail?: string;
   category?: string;
   published: boolean;
+  can_manage?: boolean;
   created_at: string;
   author_name?: string;
 }
@@ -76,6 +77,8 @@ export interface Survey {
   title: string;
   description?: string;
   form_url: string;
+  active?: boolean;
+  can_manage?: boolean;
   created_at: string;
 }
 

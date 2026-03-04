@@ -113,6 +113,31 @@ LEFT JOIN users u ON u.id = n.author_id
 WHERE n.slug = ? AND n.published = 1
 LIMIT 1;
 
+-- name: ListNewsPrivate :many
+SELECT id, title, slug, content, thumbnail, category, author_id, published, created_at
+FROM news
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
+
+-- name: GetNewsByIDPrivate :one
+SELECT id, title, slug, content, thumbnail, category, author_id, published, created_at
+FROM news
+WHERE id = ?
+LIMIT 1;
+
+-- name: CreateNews :execresult
+INSERT INTO news (id, title, slug, content, thumbnail, category, author_id, published)
+VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?);
+
+-- name: UpdateNews :exec
+UPDATE news
+SET title = ?, content = ?, thumbnail = ?, category = ?, published = ?
+WHERE id = ?;
+
+-- name: DeleteNews :exec
+DELETE FROM news
+WHERE id = ?;
+
 -- name: ListEvents :many
 SELECT id, title, description, location, event_type, zoom_link, start_time, end_time, thumbnail, created_at
 FROM events
@@ -192,3 +217,27 @@ SELECT id, title, description, form_url, created_at
 FROM surveys
 WHERE active = 1
 ORDER BY created_at DESC;
+
+-- name: ListSurveysPrivate :many
+SELECT id, title, description, form_url, author_id, active, created_at
+FROM surveys
+ORDER BY created_at DESC;
+
+-- name: GetSurveyByID :one
+SELECT id, title, description, form_url, author_id, active, created_at
+FROM surveys
+WHERE id = ?
+LIMIT 1;
+
+-- name: CreateSurvey :execresult
+INSERT INTO surveys (id, title, description, form_url, author_id, active)
+VALUES (UUID(), ?, ?, ?, ?, ?);
+
+-- name: UpdateSurvey :exec
+UPDATE surveys
+SET title = ?, description = ?, form_url = ?, active = ?
+WHERE id = ?;
+
+-- name: DeleteSurvey :exec
+DELETE FROM surveys
+WHERE id = ?;

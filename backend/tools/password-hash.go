@@ -54,7 +54,7 @@ func hashPassword(reader *bufio.Reader) {
 	}
 
 	fmt.Println()
-	fmt.Println("✅ Password berhasil di-hash!")
+	fmt.Println("Password berhasil di-hash!")
 	fmt.Println()
 	fmt.Println("Password asli:", password)
 	fmt.Println("Hash:", string(hash))
@@ -87,10 +87,10 @@ func verifyPassword(reader *bufio.Reader) {
 	
 	fmt.Println()
 	if err == nil {
-		fmt.Println("✅ Password COCOK!")
+		fmt.Println("Password COCOK!")
 		fmt.Println("Password yang Anda masukkan benar.")
 	} else {
-		fmt.Println("❌ Password TIDAK COCOK!")
+		fmt.Println("Password TIDAK COCOK!")
 		fmt.Println("Password yang Anda masukkan salah.")
 		fmt.Printf("Error: %v\n", err)
 	}

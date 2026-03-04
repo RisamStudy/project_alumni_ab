@@ -15,21 +15,27 @@ type Querier interface {
 	CreateEvent(ctx context.Context, arg CreateEventParams) (sql.Result, error)
 	CreateEventRegistration(ctx context.Context, arg CreateEventRegistrationParams) error
 	CreateJob(ctx context.Context, arg CreateJobParams) (sql.Result, error)
+	CreateNews(ctx context.Context, arg CreateNewsParams) (sql.Result, error)
 	CreatePasswordReset(ctx context.Context, arg CreatePasswordResetParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
+	CreateSurvey(ctx context.Context, arg CreateSurveyParams) (sql.Result, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
 	DeleteAllUserRefreshTokens(ctx context.Context, userID string) error
 	DeleteEvent(ctx context.Context, id string) error
 	DeleteJob(ctx context.Context, id string) error
+	DeleteNews(ctx context.Context, id string) error
 	DeleteRefreshToken(ctx context.Context, tokenHash string) error
+	DeleteSurvey(ctx context.Context, id string) error
 	GetEmailVerification(ctx context.Context, token string) (GetEmailVerificationRow, error)
 	GetEventByID(ctx context.Context, id string) (GetEventByIDRow, error)
 	GetEventByIDPrivate(ctx context.Context, id string) (Event, error)
 	GetJobByID(ctx context.Context, id string) (Job, error)
+	GetNewsByIDPrivate(ctx context.Context, id string) (GetNewsByIDPrivateRow, error)
 	GetNewsBySlug(ctx context.Context, slug string) (GetNewsBySlugRow, error)
 	GetOrCreateProfile(ctx context.Context, userID string) (GetOrCreateProfileRow, error)
 	GetPasswordReset(ctx context.Context, token string) (GetPasswordResetRow, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (GetRefreshTokenRow, error)
+	GetSurveyByID(ctx context.Context, id string) (Survey, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	GetUserEventRegistration(ctx context.Context, arg GetUserEventRegistrationParams) (EventRegistration, error)
@@ -38,11 +44,15 @@ type Querier interface {
 	ListEventsPrivate(ctx context.Context, arg ListEventsPrivateParams) ([]Event, error)
 	ListJobs(ctx context.Context, arg ListJobsParams) ([]ListJobsRow, error)
 	ListNews(ctx context.Context, arg ListNewsParams) ([]ListNewsRow, error)
+	ListNewsPrivate(ctx context.Context, arg ListNewsPrivateParams) ([]ListNewsPrivateRow, error)
 	ListSurveys(ctx context.Context) ([]ListSurveysRow, error)
+	ListSurveysPrivate(ctx context.Context) ([]Survey, error)
 	MarkEmailVerificationUsed(ctx context.Context, token string) error
 	MarkPasswordResetUsed(ctx context.Context, token string) error
 	UpdateEvent(ctx context.Context, arg UpdateEventParams) error
 	UpdateJob(ctx context.Context, arg UpdateJobParams) error
+	UpdateNews(ctx context.Context, arg UpdateNewsParams) error
+	UpdateSurvey(ctx context.Context, arg UpdateSurveyParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
 	UpsertProfile(ctx context.Context, arg UpsertProfileParams) error

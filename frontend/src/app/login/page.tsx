@@ -96,9 +96,9 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AB</span>
-              </div>
+            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white border border-primary-100">
+              <img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" />
+            </div>
               <div>
                 <p className="font-bold text-gray-900 text-sm leading-none">ALUMNI</p>
                 <p className="text-gray-400 text-xs">AL BAHJAH</p>

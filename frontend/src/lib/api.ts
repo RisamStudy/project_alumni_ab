@@ -12,12 +12,12 @@ export const api = axios.create({
 // Attach access token to every request
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
-  console.log("🔑 Request interceptor - Token:", token ? "Present" : "Missing");
+  console.log("Request interceptor - Token:", token ? "Present" : "Missing");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log("✅ Authorization header set");
+    console.log("Authorization header set");
   } else {
-    console.warn("⚠️  No access token found in store");
+    console.warn(" No access token found in store");
   }
   return config;
 });
@@ -43,7 +43,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Log all errors for debugging
-    console.error("❌ API Error:", {
+    console.error("API Error:", {
       url: originalRequest?.url,
       status: error.response?.status,
       message: error.response?.data?.message || error.message,
@@ -51,10 +51,10 @@ api.interceptors.response.use(
     });
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      console.log("🔄 Got 401, attempting token refresh...");
+      console.log("Got 401, attempting token refresh...");
       
       if (isRefreshing) {
-        console.log("⏳ Already refreshing, queuing request...");
+        console.log("Already refreshing, queuing request...");
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
@@ -67,22 +67,22 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        console.log("📡 Calling refresh token endpoint...");
+        console.log("Calling refresh token endpoint...");
         const res = await axios.post(
           `${API_URL}/api/auth/refresh`,
           {},
           { withCredentials: true }
         );
         const newToken = res.data.data.access_token;
-        console.log("✅ Token refreshed successfully");
+        console.log("Token refreshed successfully");
         
         useAuthStore.getState().setAccessToken(newToken);
         processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (err) {
-        console.error("❌ Token refresh failed:", err);
-        console.log("🚪 Logging out and redirecting to login...");
+        console.error("Token refresh failed:", err);
+        console.log("Logging out and redirecting to login...");
         processQueue(err, null);
         useAuthStore.getState().logout();
         
@@ -137,6 +137,24 @@ export const privateApi = {
     api.put("/api/private/profile", data),
   getDirectory: (q = "", page = 1, limit = 12) =>
     api.get(`/api/private/directory?q=${q}&page=${page}&limit=${limit}`),
+  listNewsPrivate: (page = 1, limit = 10) =>
+    api.get(`/api/private/news?page=${page}&limit=${limit}`),
+  createNews: (data: {
+    title: string;
+    content: string;
+    thumbnail?: string;
+    category?: string;
+    published?: boolean;
+  }) => api.post("/api/private/news", data),
+  updateNews: (id: string, data: {
+    title?: string;
+    content?: string;
+    thumbnail?: string;
+    category?: string;
+    published?: boolean;
+  }) => api.put(`/api/private/news/${id}`, data),
+  deleteNews: (id: string) =>
+    api.delete(`/api/private/news/${id}`),
   getJobs: (page = 1, limit = 10) =>
     api.get(`/api/private/jobs?page=${page}&limit=${limit}`),
   getJobById: (id: string) =>
@@ -164,6 +182,20 @@ export const privateApi = {
   deleteJob: (id: string) =>
     api.delete(`/api/private/jobs/${id}`),
   getSurveys: () => api.get("/api/private/surveys"),
+  createSurvey: (data: {
+    title: string;
+    description?: string;
+    form_url: string;
+    active?: boolean;
+  }) => api.post("/api/private/surveys", data),
+  updateSurvey: (id: string, data: {
+    title?: string;
+    description?: string;
+    form_url?: string;
+    active?: boolean;
+  }) => api.put(`/api/private/surveys/${id}`, data),
+  deleteSurvey: (id: string) =>
+    api.delete(`/api/private/surveys/${id}`),
   // Events (private CRUD)
   listEvents: (page = 1, limit = 10) =>
     api.get(`/api/private/events?page=${page}&limit=${limit}`),

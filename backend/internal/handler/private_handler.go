@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	db "alumni-albahjah/db/sqlc"
@@ -15,6 +18,11 @@ import (
 type PrivateHandler struct {
 	queries db.Querier
 }
+
+const (
+	privilegedManagerEmail = "risamaarif@gmail.com"
+	maxNewsThumbnailBytes  = 7 * 1024 * 1024
+)
 
 func NewPrivateHandler(queries db.Querier) *PrivateHandler {
 	return &PrivateHandler{queries: queries}
@@ -76,6 +84,32 @@ func canManageEvent(user *middleware.UserContext, event db.Event) bool {
 		return true
 	}
 	return event.AuthorID.Valid && event.AuthorID.String == user.UserID
+}
+
+func canManageSurveys(user *middleware.UserContext) bool {
+	if user == nil {
+		return false
+	}
+	if user.Role == "admin" {
+		return true
+	}
+	return strings.EqualFold(user.Email, privilegedManagerEmail)
+}
+
+func canManageNews(user *middleware.UserContext) bool {
+	return canManageSurveys(user)
+}
+
+var newsSlugSanitizer = regexp.MustCompile(`[^a-z0-9]+`)
+
+func makeNewsSlug(title string) string {
+	base := strings.TrimSpace(strings.ToLower(title))
+	base = newsSlugSanitizer.ReplaceAllString(base, "-")
+	base = strings.Trim(base, "-")
+	if base == "" {
+		base = "news"
+	}
+	return base + "-" + strconv.FormatInt(time.Now().Unix(), 10)
 }
 
 // GET /api/private/directory
@@ -534,6 +568,243 @@ func boolToTinyInt(b bool) int {
 	return 0
 }
 
+// ---- News Feed CRUD (admin or privileged email) ----
+
+// GET /api/private/news
+func (h *PrivateHandler) ListNewsPrivate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageNews(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola news feed")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	news, err := h.queries.ListNewsPrivate(r.Context(), db.ListNewsPrivateParams{
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil news feed")
+		return
+	}
+	if news == nil {
+		news = []db.ListNewsPrivateRow{}
+	}
+
+	type NewsItem struct {
+		ID        string  `json:"id"`
+		Title     string  `json:"title"`
+		Slug      string  `json:"slug"`
+		Content   string  `json:"content"`
+		Thumbnail *string `json:"thumbnail"`
+		Category  *string `json:"category"`
+		Published bool    `json:"published"`
+		CanManage bool    `json:"can_manage"`
+		CreatedAt string  `json:"created_at"`
+	}
+
+	result := make([]NewsItem, len(news))
+	for i, n := range news {
+		item := NewsItem{
+			ID:        n.ID,
+			Title:     n.Title,
+			Slug:      n.Slug,
+			Content:   n.Content,
+			Published: n.Published,
+			CanManage: true,
+			CreatedAt: n.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if n.Thumbnail.Valid {
+			item.Thumbnail = &n.Thumbnail.String
+		}
+		if n.Category.Valid {
+			item.Category = &n.Category.String
+		}
+		result[i] = item
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "", map[string]interface{}{
+		"news":  result,
+		"limit": limit,
+	})
+}
+
+// POST /api/private/news
+func (h *PrivateHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageNews(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola news feed")
+		return
+	}
+
+	var req struct {
+		Title     string  `json:"title"`
+		Content   string  `json:"content"`
+		Thumbnail *string `json:"thumbnail"`
+		Category  *string `json:"category"`
+		Published *bool   `json:"published"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Content) == "" {
+		util.WriteError(w, http.StatusBadRequest, "Judul dan konten wajib diisi")
+		return
+	}
+	if req.Thumbnail != nil && len(*req.Thumbnail) > maxNewsThumbnailBytes {
+		util.WriteError(w, http.StatusBadRequest, "Ukuran thumbnail terlalu besar")
+		return
+	}
+
+	published := true
+	if req.Published != nil {
+		published = *req.Published
+	}
+
+	if _, err := h.queries.CreateNews(r.Context(), db.CreateNewsParams{
+		Title:     strings.TrimSpace(req.Title),
+		Slug:      makeNewsSlug(req.Title),
+		Content:   strings.TrimSpace(req.Content),
+		Thumbnail: nullStringFromPtr(req.Thumbnail),
+		Category:  nullStringFromPtr(req.Category),
+		AuthorID:  sql.NullString{String: user.UserID, Valid: true},
+		Published: published,
+	}); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membuat news feed")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusCreated, "News feed berhasil dibuat", nil)
+}
+
+// PUT /api/private/news/{id}
+func (h *PrivateHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageNews(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola news feed")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID news tidak valid")
+		return
+	}
+
+	var req struct {
+		Title     *string `json:"title"`
+		Content   *string `json:"content"`
+		Thumbnail *string `json:"thumbnail"`
+		Category  *string `json:"category"`
+		Published *bool   `json:"published"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+
+	existing, err := h.queries.GetNewsByIDPrivate(r.Context(), id)
+	if err != nil {
+		util.WriteError(w, http.StatusNotFound, "News tidak ditemukan")
+		return
+	}
+
+	title := existing.Title
+	if req.Title != nil {
+		if strings.TrimSpace(*req.Title) == "" {
+			util.WriteError(w, http.StatusBadRequest, "Judul tidak boleh kosong")
+			return
+		}
+		title = strings.TrimSpace(*req.Title)
+	}
+
+	content := existing.Content
+	if req.Content != nil {
+		if strings.TrimSpace(*req.Content) == "" {
+			util.WriteError(w, http.StatusBadRequest, "Konten tidak boleh kosong")
+			return
+		}
+		content = strings.TrimSpace(*req.Content)
+	}
+
+	thumbnail := existing.Thumbnail
+	if req.Thumbnail != nil {
+		if len(*req.Thumbnail) > maxNewsThumbnailBytes {
+			util.WriteError(w, http.StatusBadRequest, "Ukuran thumbnail terlalu besar")
+			return
+		}
+		thumbnail = nullStringFromPtr(req.Thumbnail)
+	}
+
+	category := existing.Category
+	if req.Category != nil {
+		category = nullStringFromPtr(req.Category)
+	}
+
+	published := existing.Published
+	if req.Published != nil {
+		published = *req.Published
+	}
+
+	if err := h.queries.UpdateNews(r.Context(), db.UpdateNewsParams{
+		Title:     title,
+		Content:   content,
+		Thumbnail: thumbnail,
+		Category:  category,
+		Published: published,
+		ID:        id,
+	}); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memperbarui news feed")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "News feed berhasil diperbarui", nil)
+}
+
+// DELETE /api/private/news/{id}
+func (h *PrivateHandler) DeleteNews(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageNews(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola news feed")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID news tidak valid")
+		return
+	}
+
+	if _, err := h.queries.GetNewsByIDPrivate(r.Context(), id); err != nil {
+		util.WriteError(w, http.StatusNotFound, "News tidak ditemukan")
+		return
+	}
+
+	if err := h.queries.DeleteNews(r.Context(), id); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menghapus news feed")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "News feed berhasil dihapus", nil)
+}
+
 // ---- Events CRUD (owner or admin) ----
 
 // GET /api/private/events
@@ -897,6 +1168,55 @@ func (h *PrivateHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/private/surveys
 func (h *PrivateHandler) ListSurveys(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	canManage := canManageSurveys(user)
+
+	// Normalize sql.NullString fields to plain strings for JSON response
+	type SurveyItem struct {
+		ID          string  `json:"id"`
+		Title       string  `json:"title"`
+		Description *string `json:"description"`
+		FormURL     string  `json:"form_url"`
+		Active      bool    `json:"active"`
+		CanManage   bool    `json:"can_manage"`
+		CreatedAt   string  `json:"created_at"`
+	}
+
+	if canManage {
+		surveys, err := h.queries.ListSurveysPrivate(r.Context())
+		if err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil survei")
+			return
+		}
+		if surveys == nil {
+			surveys = []db.Survey{}
+		}
+
+		result := make([]SurveyItem, len(surveys))
+		for i, s := range surveys {
+			item := SurveyItem{
+				ID:        s.ID,
+				Title:     s.Title,
+				FormURL:   s.FormUrl,
+				Active:    s.Active,
+				CanManage: true,
+				CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
+			if s.Description.Valid {
+				item.Description = &s.Description.String
+			}
+			result[i] = item
+		}
+
+		util.WriteSuccess(w, http.StatusOK, "", result)
+		return
+	}
+
 	surveys, err := h.queries.ListSurveys(r.Context())
 	if err != nil {
 		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil survei")
@@ -906,21 +1226,14 @@ func (h *PrivateHandler) ListSurveys(w http.ResponseWriter, r *http.Request) {
 		surveys = []db.ListSurveysRow{}
 	}
 
-	// Normalize sql.NullString fields to plain strings for JSON response
-	type SurveyItem struct {
-		ID          string  `json:"id"`
-		Title       string  `json:"title"`
-		Description *string `json:"description"`
-		FormURL     string  `json:"form_url"`
-		CreatedAt   string  `json:"created_at"`
-	}
-
 	result := make([]SurveyItem, len(surveys))
 	for i, s := range surveys {
 		item := SurveyItem{
 			ID:        s.ID,
 			Title:     s.Title,
 			FormURL:   s.FormUrl,
+			Active:    true,
+			CanManage: false,
 			CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 		if s.Description.Valid {
@@ -930,6 +1243,160 @@ func (h *PrivateHandler) ListSurveys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.WriteSuccess(w, http.StatusOK, "", result)
+}
+
+// POST /api/private/surveys
+func (h *PrivateHandler) CreateSurvey(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageSurveys(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola survei")
+		return
+	}
+
+	var req struct {
+		Title       string  `json:"title"`
+		Description *string `json:"description"`
+		FormURL     string  `json:"form_url"`
+		Active      *bool   `json:"active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.FormURL) == "" {
+		util.WriteError(w, http.StatusBadRequest, "Judul dan form_url wajib diisi")
+		return
+	}
+
+	active := true
+	if req.Active != nil {
+		active = *req.Active
+	}
+
+	if _, err := h.queries.CreateSurvey(r.Context(), db.CreateSurveyParams{
+		Title:       strings.TrimSpace(req.Title),
+		Description: nullStringFromPtr(req.Description),
+		FormUrl:     strings.TrimSpace(req.FormURL),
+		AuthorID:    sql.NullString{String: user.UserID, Valid: true},
+		Active:      active,
+	}); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membuat survei")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusCreated, "Survei berhasil dibuat", nil)
+}
+
+// PUT /api/private/surveys/{id}
+func (h *PrivateHandler) UpdateSurvey(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageSurveys(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola survei")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID survei tidak valid")
+		return
+	}
+
+	var req struct {
+		Title       *string `json:"title"`
+		Description *string `json:"description"`
+		FormURL     *string `json:"form_url"`
+		Active      *bool   `json:"active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+
+	existing, err := h.queries.GetSurveyByID(r.Context(), id)
+	if err != nil {
+		util.WriteError(w, http.StatusNotFound, "Survei tidak ditemukan")
+		return
+	}
+
+	title := existing.Title
+	if req.Title != nil {
+		if strings.TrimSpace(*req.Title) == "" {
+			util.WriteError(w, http.StatusBadRequest, "Judul tidak boleh kosong")
+			return
+		}
+		title = strings.TrimSpace(*req.Title)
+	}
+
+	description := existing.Description
+	if req.Description != nil {
+		description = nullStringFromPtr(req.Description)
+	}
+
+	formURL := existing.FormUrl
+	if req.FormURL != nil {
+		if strings.TrimSpace(*req.FormURL) == "" {
+			util.WriteError(w, http.StatusBadRequest, "form_url tidak boleh kosong")
+			return
+		}
+		formURL = strings.TrimSpace(*req.FormURL)
+	}
+
+	active := existing.Active
+	if req.Active != nil {
+		active = *req.Active
+	}
+
+	if err := h.queries.UpdateSurvey(r.Context(), db.UpdateSurveyParams{
+		Title:       title,
+		Description: description,
+		FormUrl:     formURL,
+		Active:      active,
+		ID:          id,
+	}); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memperbarui survei")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "Survei berhasil diperbarui", nil)
+}
+
+// DELETE /api/private/surveys/{id}
+func (h *PrivateHandler) DeleteSurvey(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageSurveys(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola survei")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID survei tidak valid")
+		return
+	}
+
+	if _, err := h.queries.GetSurveyByID(r.Context(), id); err != nil {
+		util.WriteError(w, http.StatusNotFound, "Survei tidak ditemukan")
+		return
+	}
+
+	if err := h.queries.DeleteSurvey(r.Context(), id); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menghapus survei")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "Survei berhasil dihapus", nil)
 }
 
 // POST /api/private/events/{id}/register

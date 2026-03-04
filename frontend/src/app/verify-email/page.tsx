@@ -28,7 +28,7 @@ function VerifyContent() {
       )}
       {status === "success" && (
         <>
-          <div className="text-5xl mb-4">✅</div>
+          <div className="text-5xl mb-4"></div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Email Terverifikasi!</h2>
           <p className="text-gray-500 text-sm mb-6">{message}</p>
           <Link href="/login"

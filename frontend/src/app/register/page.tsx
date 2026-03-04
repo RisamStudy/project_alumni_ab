@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -64,9 +64,9 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       {/* Navbar minimal */}
       <div className="absolute top-0 left-0 right-0 p-4 flex items-center gap-2">
-        <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
-          <span className="text-white text-xs font-bold">AB</span>
-        </div>
+            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white border border-primary-100">
+              <img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" />
+            </div>
         <span className="font-bold text-dark-800 text-sm">ALUMNI AL BAHJAH</span>
       </div>
 
@@ -105,6 +105,10 @@ export default function RegisterPage() {
             </div>
           )}
 
+          <Link href="/" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-500 transition mb-6 w-fit">
+            <ArrowLeft size={15} />
+            Kembali ke Beranda
+          </Link>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

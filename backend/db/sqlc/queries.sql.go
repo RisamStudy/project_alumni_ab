@@ -119,6 +119,33 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (sql.Resul
 	)
 }
 
+const createNews = `-- name: CreateNews :execresult
+INSERT INTO news (id, title, slug, content, thumbnail, category, author_id, published)
+VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?)
+`
+
+type CreateNewsParams struct {
+	Title     string         `json:"title"`
+	Slug      string         `json:"slug"`
+	Content   string         `json:"content"`
+	Thumbnail sql.NullString `json:"thumbnail"`
+	Category  sql.NullString `json:"category"`
+	AuthorID  sql.NullString `json:"author_id"`
+	Published bool           `json:"published"`
+}
+
+func (q *Queries) CreateNews(ctx context.Context, arg CreateNewsParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createNews,
+		arg.Title,
+		arg.Slug,
+		arg.Content,
+		arg.Thumbnail,
+		arg.Category,
+		arg.AuthorID,
+		arg.Published,
+	)
+}
+
 const createPasswordReset = `-- name: CreatePasswordReset :exec
 INSERT INTO password_resets (id, user_id, token, expires_at)
 VALUES (UUID(), ?, ?, ?)
@@ -149,6 +176,29 @@ type CreateRefreshTokenParams struct {
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error {
 	_, err := q.db.ExecContext(ctx, createRefreshToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	return err
+}
+
+const createSurvey = `-- name: CreateSurvey :execresult
+INSERT INTO surveys (id, title, description, form_url, author_id, active)
+VALUES (UUID(), ?, ?, ?, ?, ?)
+`
+
+type CreateSurveyParams struct {
+	Title       string         `json:"title"`
+	Description sql.NullString `json:"description"`
+	FormUrl     string         `json:"form_url"`
+	AuthorID    sql.NullString `json:"author_id"`
+	Active      bool           `json:"active"`
+}
+
+func (q *Queries) CreateSurvey(ctx context.Context, arg CreateSurveyParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createSurvey,
+		arg.Title,
+		arg.Description,
+		arg.FormUrl,
+		arg.AuthorID,
+		arg.Active,
+	)
 }
 
 const createUser = `-- name: CreateUser :execresult
@@ -199,12 +249,32 @@ func (q *Queries) DeleteJob(ctx context.Context, id string) error {
 	return err
 }
 
+const deleteNews = `-- name: DeleteNews :exec
+DELETE FROM news
+WHERE id = ?
+`
+
+func (q *Queries) DeleteNews(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteNews, id)
+	return err
+}
+
 const deleteRefreshToken = `-- name: DeleteRefreshToken :exec
 DELETE FROM refresh_tokens WHERE token_hash = ?
 `
 
 func (q *Queries) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
 	_, err := q.db.ExecContext(ctx, deleteRefreshToken, tokenHash)
+	return err
+}
+
+const deleteSurvey = `-- name: DeleteSurvey :exec
+DELETE FROM surveys
+WHERE id = ?
+`
+
+func (q *Queries) DeleteSurvey(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteSurvey, id)
 	return err
 }
 
@@ -321,6 +391,42 @@ func (q *Queries) GetJobByID(ctx context.Context, id string) (Job, error) {
 		&i.ApplyUrl,
 		&i.PostedBy,
 		&i.ExpiresAt,
+		&i.Published,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getNewsByIDPrivate = `-- name: GetNewsByIDPrivate :one
+SELECT id, title, slug, content, thumbnail, category, author_id, published, created_at
+FROM news
+WHERE id = ?
+LIMIT 1
+`
+
+type GetNewsByIDPrivateRow struct {
+	ID        string         `json:"id"`
+	Title     string         `json:"title"`
+	Slug      string         `json:"slug"`
+	Content   string         `json:"content"`
+	Thumbnail sql.NullString `json:"thumbnail"`
+	Category  sql.NullString `json:"category"`
+	AuthorID  sql.NullString `json:"author_id"`
+	Published bool           `json:"published"`
+	CreatedAt time.Time      `json:"created_at"`
+}
+
+func (q *Queries) GetNewsByIDPrivate(ctx context.Context, id string) (GetNewsByIDPrivateRow, error) {
+	row := q.db.QueryRowContext(ctx, getNewsByIDPrivate, id)
+	var i GetNewsByIDPrivateRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Slug,
+		&i.Content,
+		&i.Thumbnail,
+		&i.Category,
+		&i.AuthorID,
 		&i.Published,
 		&i.CreatedAt,
 	)
@@ -457,6 +563,28 @@ func (q *Queries) GetRefreshToken(ctx context.Context, tokenHash string) (GetRef
 		&i.UserID,
 		&i.TokenHash,
 		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const getSurveyByID = `-- name: GetSurveyByID :one
+SELECT id, title, description, form_url, author_id, active, created_at
+FROM surveys
+WHERE id = ?
+LIMIT 1
+`
+
+func (q *Queries) GetSurveyByID(ctx context.Context, id string) (Survey, error) {
+	row := q.db.QueryRowContext(ctx, getSurveyByID, id)
+	var i Survey
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Description,
+		&i.FormUrl,
+		&i.AuthorID,
+		&i.Active,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -843,6 +971,63 @@ func (q *Queries) ListNews(ctx context.Context, arg ListNewsParams) ([]ListNewsR
 	return items, nil
 }
 
+const listNewsPrivate = `-- name: ListNewsPrivate :many
+SELECT id, title, slug, content, thumbnail, category, author_id, published, created_at
+FROM news
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?
+`
+
+type ListNewsPrivateParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListNewsPrivateRow struct {
+	ID        string         `json:"id"`
+	Title     string         `json:"title"`
+	Slug      string         `json:"slug"`
+	Content   string         `json:"content"`
+	Thumbnail sql.NullString `json:"thumbnail"`
+	Category  sql.NullString `json:"category"`
+	AuthorID  sql.NullString `json:"author_id"`
+	Published bool           `json:"published"`
+	CreatedAt time.Time      `json:"created_at"`
+}
+
+func (q *Queries) ListNewsPrivate(ctx context.Context, arg ListNewsPrivateParams) ([]ListNewsPrivateRow, error) {
+	rows, err := q.db.QueryContext(ctx, listNewsPrivate, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNewsPrivateRow{}
+	for rows.Next() {
+		var i ListNewsPrivateRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Slug,
+			&i.Content,
+			&i.Thumbnail,
+			&i.Category,
+			&i.AuthorID,
+			&i.Published,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSurveys = `-- name: ListSurveys :many
 SELECT id, title, description, form_url, created_at
 FROM surveys
@@ -872,6 +1057,43 @@ func (q *Queries) ListSurveys(ctx context.Context) ([]ListSurveysRow, error) {
 			&i.Title,
 			&i.Description,
 			&i.FormUrl,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSurveysPrivate = `-- name: ListSurveysPrivate :many
+SELECT id, title, description, form_url, author_id, active, created_at
+FROM surveys
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListSurveysPrivate(ctx context.Context) ([]Survey, error) {
+	rows, err := q.db.QueryContext(ctx, listSurveysPrivate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Survey{}
+	for rows.Next() {
+		var i Survey
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.FormUrl,
+			&i.AuthorID,
+			&i.Active,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -968,6 +1190,58 @@ func (q *Queries) UpdateJob(ctx context.Context, arg UpdateJobParams) error {
 		arg.ApplyUrl,
 		arg.ExpiresAt,
 		arg.Published,
+		arg.ID,
+	)
+	return err
+}
+
+const updateNews = `-- name: UpdateNews :exec
+UPDATE news
+SET title = ?, content = ?, thumbnail = ?, category = ?, published = ?
+WHERE id = ?
+`
+
+type UpdateNewsParams struct {
+	Title     string         `json:"title"`
+	Content   string         `json:"content"`
+	Thumbnail sql.NullString `json:"thumbnail"`
+	Category  sql.NullString `json:"category"`
+	Published bool           `json:"published"`
+	ID        string         `json:"id"`
+}
+
+func (q *Queries) UpdateNews(ctx context.Context, arg UpdateNewsParams) error {
+	_, err := q.db.ExecContext(ctx, updateNews,
+		arg.Title,
+		arg.Content,
+		arg.Thumbnail,
+		arg.Category,
+		arg.Published,
+		arg.ID,
+	)
+	return err
+}
+
+const updateSurvey = `-- name: UpdateSurvey :exec
+UPDATE surveys
+SET title = ?, description = ?, form_url = ?, active = ?
+WHERE id = ?
+`
+
+type UpdateSurveyParams struct {
+	Title       string         `json:"title"`
+	Description sql.NullString `json:"description"`
+	FormUrl     string         `json:"form_url"`
+	Active      bool           `json:"active"`
+	ID          string         `json:"id"`
+}
+
+func (q *Queries) UpdateSurvey(ctx context.Context, arg UpdateSurveyParams) error {
+	_, err := q.db.ExecContext(ctx, updateSurvey,
+		arg.Title,
+		arg.Description,
+		arg.FormUrl,
+		arg.Active,
 		arg.ID,
 	)
 	return err
