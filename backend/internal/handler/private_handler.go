@@ -21,7 +21,7 @@ type PrivateHandler struct {
 
 const (
 	privilegedManagerEmail = "risamaarif@gmail.com"
-	maxNewsThumbnailBytes  = 7 * 1024 * 1024
+	maxNewsThumbnailBytes  = 60000
 )
 
 func NewPrivateHandler(queries db.Querier) *PrivateHandler {
@@ -661,7 +661,7 @@ func (h *PrivateHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Thumbnail != nil && len(*req.Thumbnail) > maxNewsThumbnailBytes {
-		util.WriteError(w, http.StatusBadRequest, "Ukuran thumbnail terlalu besar")
+		util.WriteError(w, http.StatusBadRequest, "Thumbnail terlalu besar untuk disimpan. Gunakan gambar lebih kecil.")
 		return
 	}
 
@@ -743,7 +743,7 @@ func (h *PrivateHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 	thumbnail := existing.Thumbnail
 	if req.Thumbnail != nil {
 		if len(*req.Thumbnail) > maxNewsThumbnailBytes {
-			util.WriteError(w, http.StatusBadRequest, "Ukuran thumbnail terlalu besar")
+			util.WriteError(w, http.StatusBadRequest, "Thumbnail terlalu besar untuk disimpan. Gunakan gambar lebih kecil.")
 			return
 		}
 		thumbnail = nullStringFromPtr(req.Thumbnail)

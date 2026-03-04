@@ -10,16 +10,19 @@ import {
   Briefcase,
   CalendarDays,
   CheckCircle,
+  ClipboardList,
   MapPin,
+  Newspaper,
   Pencil,
   Plus,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 
 const SPECIAL_MANAGER_EMAIL = "risamaarif@gmail.com";
 const MAX_NEWS_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_NEWS_THUMBNAIL_DATAURL_LENGTH = 6_800_000;
+const MAX_NEWS_THUMBNAIL_DATAURL_LENGTH = 60000;
 
 export default function HomeDashboard() {
   const { user } = useAuthStore();
@@ -118,7 +121,7 @@ export default function HomeDashboard() {
 
         URL.revokeObjectURL(objectURL);
         if (result.length > MAX_NEWS_THUMBNAIL_DATAURL_LENGTH) {
-          reject(new Error("Ukuran gambar terlalu besar. Gunakan resolusi lebih kecil."));
+          reject(new Error("Thumbnail masih terlalu besar untuk disimpan. Coba gambar dengan resolusi lebih kecil."));
           return;
         }
 
@@ -297,18 +300,20 @@ export default function HomeDashboard() {
         <h2 className="font-semibold text-gray-900 mb-4">Quick Access</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: "News Feed", href: "/home", emoji: "??" },
-            { label: "Directory", href: "/home/direktori", emoji: "??" },
-            { label: "Events", href: "/home/event", emoji: "??" },
-            { label: "Jobs Hub", href: "/home/lowongan", emoji: "??" },
-            { label: "Surveys", href: "/home/survei", emoji: "??" },
-          ].map(({ label, href, emoji }) => (
+            { label: "News Feed", href: "/home", icon: Newspaper, tone: "text-sky-600 bg-sky-50" },
+            { label: "Directory", href: "/home/direktori", icon: Users, tone: "text-emerald-600 bg-emerald-50" },
+            { label: "Events", href: "/home/event", icon: CalendarDays, tone: "text-indigo-600 bg-indigo-50" },
+            { label: "Jobs Hub", href: "/home/lowongan", icon: Briefcase, tone: "text-amber-700 bg-amber-50" },
+            { label: "Surveys", href: "/home/survei", icon: ClipboardList, tone: "text-rose-600 bg-rose-50" },
+          ].map(({ label, href, icon: Icon, tone }) => (
             <Link
               key={href}
               href={href}
               className="bg-white border rounded-xl p-4 flex flex-col items-center gap-2 text-center hover:border-primary-300 hover:shadow-sm transition"
             >
-              <span className="text-2xl">{emoji}</span>
+              <span className={`w-10 h-10 rounded-lg flex items-center justify-center ${tone}`}>
+                <Icon size={20} />
+              </span>
               <span className="text-xs font-medium text-gray-700">{label}</span>
             </Link>
           ))}
@@ -596,4 +601,3 @@ export default function HomeDashboard() {
     </div>
   );
 }
-
