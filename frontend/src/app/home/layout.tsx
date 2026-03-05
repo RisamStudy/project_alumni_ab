@@ -98,13 +98,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
-            <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 relative">
+            <Link
+              href="/home/notifikasi"
+              aria-label="Notifikasi"
+              title="Notifikasi"
+              className={`w-9 h-9 flex items-center justify-center rounded-lg relative transition ${
+                pathname === "/home/notifikasi"
+                  ? "bg-primary-50 text-primary-600"
+                  : "hover:bg-gray-100 text-gray-500"
+              }`}
+            >
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-            <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500">
+            </Link>
+            <Link
+              href="/home/pengaturan"
+              aria-label="Pengaturan"
+              title="Pengaturan"
+              className={`w-9 h-9 flex items-center justify-center rounded-lg transition ${
+                pathname === "/home/pengaturan"
+                  ? "bg-primary-50 text-primary-600"
+                  : "hover:bg-gray-100 text-gray-500"
+              }`}
+            >
               <Settings size={18} />
-            </button>
+            </Link>
             {/* Profile dropdown */}
             <div className="relative group">
               <button className="flex items-center gap-2 hover:bg-gray-100 rounded-lg p-1.5 transition">
