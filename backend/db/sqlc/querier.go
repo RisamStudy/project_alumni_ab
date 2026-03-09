@@ -11,6 +11,7 @@ import (
 
 type Querier interface {
 	CountAlumni(ctx context.Context) (int64, error)
+	CreateAlumniUserByAdmin(ctx context.Context, arg CreateAlumniUserByAdminParams) (sql.Result, error)
 	CreateEmailVerification(ctx context.Context, arg CreateEmailVerificationParams) error
 	CreateEvent(ctx context.Context, arg CreateEventParams) (sql.Result, error)
 	CreateEventRegistration(ctx context.Context, arg CreateEventRegistrationParams) error
@@ -21,6 +22,7 @@ type Querier interface {
 	CreateSurvey(ctx context.Context, arg CreateSurveyParams) (sql.Result, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
 	DeleteAllUserRefreshTokens(ctx context.Context, userID string) error
+	DeleteAlumniUserByAdmin(ctx context.Context, id string) error
 	DeleteEvent(ctx context.Context, id string) error
 	DeleteJob(ctx context.Context, id string) error
 	DeleteNews(ctx context.Context, id string) error
@@ -49,6 +51,7 @@ type Querier interface {
 	ListSurveysPrivate(ctx context.Context) ([]Survey, error)
 	MarkEmailVerificationUsed(ctx context.Context, token string) error
 	MarkPasswordResetUsed(ctx context.Context, token string) error
+	UpdateAlumniUserByAdmin(ctx context.Context, arg UpdateAlumniUserByAdminParams) error
 	UpdateEvent(ctx context.Context, arg UpdateEventParams) error
 	UpdateJob(ctx context.Context, arg UpdateJobParams) error
 	UpdateNews(ctx context.Context, arg UpdateNewsParams) error

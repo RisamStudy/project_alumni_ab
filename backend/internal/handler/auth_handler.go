@@ -1,10 +1,16 @@
 package handler
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	db "alumni-albahjah/db/sqlc"
@@ -434,4 +440,113 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.WriteSuccess(w, http.StatusOK, "Profil berhasil diperbarui", nil)
+}
+
+// POST /api/private/upload/profile-photo
+func (h *AuthHandler) UploadProfilePhoto(w http.ResponseWriter, r *http.Request) {
+	const maxPhotoSize = 10 * 1024 * 1024 // 10MB
+
+	if err := r.ParseMultipartForm(maxPhotoSize); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Ukuran file maksimal 10MB")
+		return
+	}
+
+	file, header, err := r.FormFile("photo")
+	if err != nil {
+		util.WriteError(w, http.StatusBadRequest, "File foto tidak ditemukan")
+		return
+	}
+	defer file.Close()
+
+	if header.Size > maxPhotoSize {
+		util.WriteError(w, http.StatusBadRequest, "Ukuran file maksimal 10MB")
+		return
+	}
+
+	// Read file header to detect content type.
+	sniff := make([]byte, 512)
+	n, _ := file.Read(sniff)
+	contentType := http.DetectContentType(sniff[:n])
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membaca file upload")
+		return
+	}
+
+	var ext string
+	switch contentType {
+	case "image/jpeg":
+		ext = ".jpg"
+	case "image/png":
+		ext = ".png"
+	case "image/webp":
+		ext = ".webp"
+	default:
+		util.WriteError(w, http.StatusBadRequest, "Format file harus JPG, PNG, atau WebP")
+		return
+	}
+
+	filename, err := generateProfilePhotoFilename(ext)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memproses nama file")
+		return
+	}
+
+	uploadDir := resolveProfileUploadDir()
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menyiapkan folder upload")
+		return
+	}
+
+	dstPath := filepath.Join(uploadDir, filename)
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menyimpan foto")
+		return
+	}
+	defer dst.Close()
+
+	written, err := io.Copy(dst, io.LimitReader(file, maxPhotoSize+1))
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menyimpan foto")
+		return
+	}
+	if written > maxPhotoSize {
+		_ = os.Remove(dstPath)
+		util.WriteError(w, http.StatusBadRequest, "Ukuran file maksimal 10MB")
+		return
+	}
+
+	photoURL := buildPublicUploadURL(r, filename)
+	util.WriteSuccess(w, http.StatusOK, "Foto profil berhasil diupload", map[string]interface{}{
+		"photo_url": photoURL,
+	})
+}
+
+func generateProfilePhotoFilename(ext string) (string, error) {
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("profile_%d_%s%s", time.Now().UnixNano(), strings.ToLower(fmt.Sprintf("%x", b)), ext), nil
+}
+
+func resolveProfileUploadDir() string {
+	if _, err := os.Stat(filepath.Join("frontend", "public")); err == nil {
+		return filepath.Join("frontend", "public", "uploads", "profiles")
+	}
+	if _, err := os.Stat(filepath.Join("..", "frontend", "public")); err == nil {
+		return filepath.Join("..", "frontend", "public", "uploads", "profiles")
+	}
+	return filepath.Join("uploads", "profiles")
+}
+
+func buildPublicUploadURL(r *http.Request, filename string) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if forwardedProto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwardedProto != "" {
+		scheme = forwardedProto
+	}
+	return fmt.Sprintf("%s://%s/uploads/profiles/%s", scheme, r.Host, filename)
 }

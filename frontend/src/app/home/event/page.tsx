@@ -229,7 +229,7 @@ export default function EventPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Event Calendar</h1>
           <p className="text-gray-500 text-sm mt-1">Kelola event milik Anda. Admin dapat mengelola semua event.</p>
@@ -271,7 +271,10 @@ export default function EventPage() {
             const date = new Date(event.start_time);
             const isOnline = event.event_type === "online";
             return (
-              <div key={event.id} className="bg-white border rounded-xl p-5 flex gap-4 hover:shadow-md transition">
+              <div
+                key={event.id}
+                className="bg-white border rounded-xl p-5 flex flex-col gap-4 sm:flex-row hover:shadow-md transition"
+              >
                 <div className="shrink-0 w-16 h-16 bg-primary-50 rounded-xl flex flex-col items-center justify-center text-primary-600 overflow-hidden">
                   {event.thumbnail ? (
                     <img src={event.thumbnail} alt="" className="w-full h-full object-cover" />
@@ -286,7 +289,7 @@ export default function EventPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <span
                         className={`inline-block text-xs px-2 py-0.5 rounded-full mb-1 ${
@@ -327,7 +330,7 @@ export default function EventPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end shrink-0">
                       <Link
                         href={`/home/event/${event.id}`}
                         className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"

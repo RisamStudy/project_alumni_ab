@@ -1,9 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { privateApi } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { Loader2, Save } from "lucide-react";
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const MAX_PROFILE_PHOTO_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_PROFILE_PHOTO_DIMENSION = 1600;
+
+const resolvePhotoURL = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  if (url.startsWith("/uploads/") && API_BASE_URL) return `${API_BASE_URL}${url}`;
+  return url;
+};
+
+const canvasToJpegBlob = (canvas: HTMLCanvasElement, quality: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Gagal mengonversi gambar."));
+          return;
+        }
+        resolve(blob);
+      },
+      "image/jpeg",
+      quality
+    );
+  });
 
 export default function ProfilPage() {
   const { user, updateProfileCompletion, updateProfilePhoto } = useAuthStore();
@@ -22,6 +48,9 @@ export default function ProfilPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const [photoFileName, setPhotoFileName] = useState("");
 
   useEffect(() => {
     privateApi.getProfile().then((r) => {
@@ -40,6 +69,80 @@ export default function ProfilPage() {
       });
     }).finally(() => setLoading(false));
   }, []);
+
+  const convertProfilePhoto = async (file: File): Promise<File> => {
+    const objectURL = URL.createObjectURL(file);
+    const img = new Image();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("File gambar tidak valid."));
+        img.src = objectURL;
+      });
+
+      const scale = Math.min(1, MAX_PROFILE_PHOTO_DIMENSION / img.width, MAX_PROFILE_PHOTO_DIMENSION / img.height);
+      const width = Math.max(1, Math.round(img.width * scale));
+      const height = Math.max(1, Math.round(img.height * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Canvas tidak tersedia.");
+      }
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      let quality = 0.9;
+      while (quality >= 0.4) {
+        const blob = await canvasToJpegBlob(canvas, quality);
+        if (blob.size <= MAX_PROFILE_PHOTO_SIZE) {
+          return new File([blob], `profile-${Date.now()}.jpg`, { type: "image/jpeg" });
+        }
+        quality -= 0.1;
+      }
+
+      throw new Error("Ukuran foto setelah konversi masih lebih dari 10MB.");
+    } finally {
+      URL.revokeObjectURL(objectURL);
+    }
+  };
+
+  const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("File harus berupa gambar (JPG, PNG, atau WebP).");
+      e.target.value = "";
+      return;
+    }
+
+    setPhotoUploading(true);
+    setPhotoError("");
+    setSaved(false);
+
+    try {
+      const converted = await convertProfilePhoto(file);
+      const res = await privateApi.uploadProfilePhoto(converted);
+      const photoURL = res.data?.data?.photo_url as string | undefined;
+      if (!photoURL) {
+        throw new Error("URL foto dari server tidak ditemukan.");
+      }
+
+      setForm((prev) => ({ ...prev, photo_url: photoURL }));
+      setPhotoFileName(file.name);
+    } catch (err: unknown) {
+      setPhotoError((err as Error)?.message || "Gagal upload foto profil.");
+    } finally {
+      setPhotoUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +180,7 @@ export default function ProfilPage() {
       <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-6 flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-primary-200 flex items-center justify-center text-primary-700 text-xl font-bold overflow-hidden">
           {form.photo_url ? (
-            <img src={form.photo_url} alt="" className="w-full h-full object-cover" />
+            <img src={resolvePhotoURL(form.photo_url)} alt="" className="w-full h-full object-cover" />
           ) : user?.full_name?.charAt(0)}
         </div>
         <div>
@@ -90,11 +193,34 @@ export default function ProfilPage() {
       <form onSubmit={handleSave} className="bg-white border rounded-xl p-6 space-y-5">
         <h2 className="font-semibold text-gray-800 pb-3 border-b">Informasi Profil</h2>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">URL Foto Profil (Gdrive)</label>
-          <input type="url" placeholder="https://..." value={form.photo_url}
-            onChange={(e) => setForm({ ...form, photo_url: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Foto Profil</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoUpload}
+            disabled={photoUploading}
+            className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-primary-700"
+          />
+          <p className="text-xs text-gray-500">
+            Upload JPG/PNG/WebP. File akan dikonversi otomatis sebelum upload, dengan ukuran maksimal 10MB.
+          </p>
+          {photoUploading && <p className="text-xs text-primary-500">Mengupload foto...</p>}
+          {photoFileName && <p className="text-xs text-gray-600">File dipilih: {photoFileName}</p>}
+          {photoError && <p className="text-sm text-red-600">{photoError}</p>}
+          {form.photo_url && (
+            <button
+              type="button"
+              onClick={() => {
+                setForm((prev) => ({ ...prev, photo_url: "" }));
+                setPhotoFileName("");
+                setPhotoError("");
+              }}
+              className="text-xs text-rose-600 hover:text-rose-700 hover:underline transition"
+            >
+              Hapus foto profil
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -164,12 +290,12 @@ export default function ProfilPage() {
         </div>
 
         <div className="flex items-center gap-3 pt-2">
-          <button type="submit" disabled={saving}
+          <button type="submit" disabled={saving || photoUploading}
             className="bg-primary-500 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-primary-600 transition disabled:opacity-60 flex items-center gap-2">
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
             Simpan Perubahan
           </button>
-          {saved && <span className="text-sm text-primary-500">✓ Tersimpan!</span>}
+          {saved && <span className="text-sm text-primary-500">Tersimpan!</span>}
         </div>
       </form>
     </div>

@@ -18,15 +18,15 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white w-full overflow-x-hidden">
       {/* Navbar */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
+      <nav className="border-b bg-white sticky top-0 z-50 w-full overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-3 h-16 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white border border-primary-100">
               <img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" />
             </div>
-            <span className="font-bold text-gray-900">Alumni Al Bahjah</span>
+            <span className="font-bold text-gray-900 hidden sm:inline truncate">Alumni Al Bahjah</span>
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm text-gray-600">
             <Link href="/#berita" className="hover:text-primary-500">Berita</Link>
@@ -34,17 +34,17 @@ export default function LandingPage() {
             <Link href="/#direktori" className="hover:text-primary-500">Directory</Link>
             <Link href="/#karir" className="hover:text-primary-500">Karir</Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {isAuthenticated ? (
               <Link href="/home"
-                className="bg-primary-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-600 transition">
+                className="bg-primary-500 text-white px-3 sm:px-4 py-2 rounded-lg text-sm hover:bg-primary-600 transition whitespace-nowrap">
                 Dashboard
               </Link>
             ) : (
               <>
-                <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">Login</Link>
+                <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900 whitespace-nowrap">Login</Link>
                 <Link href="/register"
-                  className="bg-primary-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-600 transition">
+                  className="bg-primary-500 text-white px-3 sm:px-4 py-2 rounded-lg text-sm hover:bg-primary-600 transition whitespace-nowrap">
                   Daftar
                 </Link>
               </>
@@ -55,31 +55,31 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="bg-gradient-to-br from-primary-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 grid md:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20 grid md:grid-cols-2 gap-8 sm:gap-12 items-center">
           <div>
             <span className="text-xs text-primary-500 font-semibold tracking-wider uppercase flex items-center gap-1.5 mb-4">
               <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
               Official Alumni Portal
             </span>
-            <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-4">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-4">
               Selamat Datang di<br />Portal Alumni{" "}
               <span className="text-primary-500">Al Bahjah</span>
             </h1>
-            <p className="text-gray-500 mb-8 leading-relaxed">
+            <p className="text-gray-500 mb-8 leading-relaxed text-sm sm:text-base">
               Wadah resmi untuk menjalin silaturahmi antar alumni, berbagi peluang karir,
               dan tetap terhubung dengan perkembangan terbaru Pondok Pesantren Al Bahjah.
             </p>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Link href="/register"
-                className="bg-primary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-600 transition flex items-center gap-2">
+                className="bg-primary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-600 transition flex items-center justify-center gap-2 w-full sm:w-auto">
                 Gabung Sekarang <ArrowRight size={16} />
               </Link>
               <Link href="/#tentang"
-                className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition">
+                className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition text-center w-full sm:w-auto">
                 Pelajari Lebih Lanjut
               </Link>
             </div>
-            <div className="flex items-center gap-2 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-6">
               <div className="flex -space-x-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="w-8 h-8 rounded-full bg-primary-200 border-2 border-white" />
@@ -93,7 +93,7 @@ export default function LandingPage() {
           </div>
           <div className="relative">
             <div
-              className="rounded-2xl overflow-hidden h-80 flex items-end p-6 bg-cover bg-[position:20%_32%] bg-dark-800"
+              className="rounded-2xl overflow-hidden h-64 sm:h-80 flex items-end p-6 bg-cover bg-[position:20%_32%] bg-dark-800"
               style={{ backgroundImage: "url('/Buya2.jpeg')" }}
             >
               {/* Dark gradient overlay */}
@@ -111,12 +111,12 @@ export default function LandingPage() {
       {/* Latest News */}
       <section id="berita" className="py-16 bg-primary-50/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Berita Pondok Terbaru</h2>
               <p className="text-gray-500 text-sm mt-1">Ikuti perkembangan terkini dari pusat kegiatan dakwah.</p>
             </div>
-            <Link href="/berita" className="text-primary-500 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all">
+            <Link href="/berita" className="text-primary-500 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all self-start sm:self-auto">
               Lihat Semua <ArrowRight size={14} />
             </Link>
           </div>
@@ -173,13 +173,14 @@ export default function LandingPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{event.title}</h3>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <CalendarDays size={13} />{date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-400">
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <CalendarDays size={13} className="shrink-0" />{date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
                       </span>
                       {event.location && (
-                        <span className="flex items-center gap-1 truncate">
-                          <MapPin size={13} />{event.location}
+                        <span className="flex items-center gap-1 min-w-0">
+                          <MapPin size={13} className="shrink-0" />
+                          <span className="truncate">{event.location}</span>
                         </span>
                       )}
                     </div>
@@ -242,13 +243,13 @@ export default function LandingPage() {
             Jangan lewatkan kesempatan untuk saling membantu dan menginspirasi sesama alumni.
             Daftar sekarang dan jadilah bagian dari perubahan.
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <Link href="/register"
-              className="bg-primary-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-600 transition uppercase text-sm tracking-wide">
+              className="bg-primary-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-600 transition uppercase text-sm tracking-wide w-full sm:w-auto">
               Daftar Sekarang
             </Link>
             <Link href="/kontak"
-              className="border border-primary-500 text-primary-400 px-8 py-3 rounded-lg font-semibold hover:bg-primary-500/10 transition uppercase text-sm tracking-wide">
+              className="border border-primary-500 text-primary-400 px-8 py-3 rounded-lg font-semibold hover:bg-primary-500/10 transition uppercase text-sm tracking-wide w-full sm:w-auto">
               Hubungi Kami
             </Link>
           </div>
@@ -262,8 +263,8 @@ export default function LandingPage() {
             <div className="w-6 h-6 bg-primary-500 rounded-full" />
             <span className="text-white font-medium">Alumni Al Bahjah</span>
           </div>
-          <span>© 2024 Portal Alumni Al Bahjah. All rights reserved.</span>
-          <div className="flex gap-4">
+          <span className="text-center">(c) 2024 Portal Alumni Al Bahjah. All rights reserved.</span>
+          <div className="flex flex-wrap justify-center gap-4">
             <Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
           </div>
@@ -272,3 +273,4 @@ export default function LandingPage() {
     </div>
   );
 }
+

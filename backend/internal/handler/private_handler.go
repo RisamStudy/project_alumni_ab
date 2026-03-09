@@ -13,6 +13,7 @@ import (
 	db "alumni-albahjah/db/sqlc"
 	"alumni-albahjah/internal/middleware"
 	"alumni-albahjah/internal/util"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type PrivateHandler struct {
@@ -73,6 +74,9 @@ func canManageJob(user *middleware.UserContext, job db.Job) bool {
 	if user.Role == "admin" {
 		return true
 	}
+	if strings.EqualFold(user.Email, privilegedManagerEmail) {
+		return true
+	}
 	return job.PostedBy.Valid && job.PostedBy.String == user.UserID
 }
 
@@ -100,6 +104,10 @@ func canManageNews(user *middleware.UserContext) bool {
 	return canManageSurveys(user)
 }
 
+func canManageDirectory(user *middleware.UserContext) bool {
+	return canManageSurveys(user)
+}
+
 var newsSlugSanitizer = regexp.MustCompile(`[^a-z0-9]+`)
 
 func makeNewsSlug(title string) string {
@@ -114,6 +122,12 @@ func makeNewsSlug(title string) string {
 
 // GET /api/private/directory
 func (h *PrivateHandler) ListDirectory(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	limit, offset := parsePagination(r)
 	search := r.URL.Query().Get("q")
 
@@ -148,15 +162,18 @@ func (h *PrivateHandler) ListDirectory(w http.ResponseWriter, r *http.Request) {
 		Major          *string `json:"major"`
 		LinkedinURL    *string `json:"linkedin_url"`
 		InstagramURL   *string `json:"instagram_url"`
+		CanManage      bool    `json:"can_manage"`
 	}
 
 	result := make([]AlumniItem, len(alumni))
+	canManage := canManageDirectory(user)
 	for i, a := range alumni {
 		item := AlumniItem{
 			ID:        a.ID,
 			FullName:  a.FullName,
 			BirthYear: a.BirthYear,
 			Email:     a.Email,
+			CanManage: canManage,
 		}
 		if a.PhotoUrl.Valid {
 			item.PhotoURL = &a.PhotoUrl.String
@@ -186,10 +203,266 @@ func (h *PrivateHandler) ListDirectory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.WriteSuccess(w, http.StatusOK, "", map[string]interface{}{
-		"alumni": result,
-		"total":  total,
-		"limit":  limit,
+		"alumni":     result,
+		"total":      total,
+		"limit":      limit,
+		"can_manage": canManage,
 	})
+}
+
+// POST /api/private/directory
+func (h *PrivateHandler) CreateDirectoryAlumni(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageDirectory(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola direktori alumni")
+		return
+	}
+
+	var req struct {
+		FullName       string  `json:"full_name"`
+		BirthYear      int16   `json:"birth_year"`
+		Email          string  `json:"email"`
+		PhotoURL       *string `json:"photo_url"`
+		City           *string `json:"city"`
+		JobTitle       *string `json:"job_title"`
+		Company        *string `json:"company"`
+		GraduationYear *int16  `json:"graduation_year"`
+		Major          *string `json:"major"`
+		LinkedinURL    *string `json:"linkedin_url"`
+		InstagramURL   *string `json:"instagram_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+
+	fullName := strings.TrimSpace(req.FullName)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	currentYear := int16(time.Now().Year() + 1)
+	if fullName == "" || email == "" || req.BirthYear < 1940 || req.BirthYear > currentYear {
+		util.WriteError(w, http.StatusBadRequest, "Nama, email, dan tahun lahir valid wajib diisi")
+		return
+	}
+
+	passwordHash, err := generateRandomPasswordHash()
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menyiapkan data akun alumni")
+		return
+	}
+
+	if _, err := h.queries.CreateAlumniUserByAdmin(r.Context(), db.CreateAlumniUserByAdminParams{
+		FullName:  fullName,
+		BirthYear: req.BirthYear,
+		Email:     email,
+		Password:  passwordHash,
+	}); err != nil {
+		if isDuplicateEmailErr(err) {
+			util.WriteError(w, http.StatusConflict, "Email sudah digunakan alumni lain")
+			return
+		}
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membuat data alumni")
+		return
+	}
+
+	createdUser, err := h.queries.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Data alumni dibuat tapi gagal mengambil detail user")
+		return
+	}
+
+	if hasProfilePayload(req.PhotoURL, req.City, req.JobTitle, req.Company, req.GraduationYear, req.Major, req.LinkedinURL, req.InstagramURL) {
+		if err := h.queries.UpsertProfile(r.Context(), db.UpsertProfileParams{
+			UserID:         createdUser.ID,
+			PhotoUrl:       normalizeOptionalString(req.PhotoURL),
+			Phone:          sql.NullString{},
+			GraduationYear: normalizeOptionalInt16(req.GraduationYear),
+			Major:          normalizeOptionalString(req.Major),
+			City:           normalizeOptionalString(req.City),
+			JobTitle:       normalizeOptionalString(req.JobTitle),
+			Company:        normalizeOptionalString(req.Company),
+			Bio:            sql.NullString{},
+			LinkedinUrl:    normalizeOptionalString(req.LinkedinURL),
+			InstagramUrl:   normalizeOptionalString(req.InstagramURL),
+		}); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Data alumni dibuat tetapi profil gagal disimpan")
+			return
+		}
+	}
+
+	util.WriteSuccess(w, http.StatusCreated, "Data alumni berhasil ditambahkan", map[string]interface{}{
+		"id": createdUser.ID,
+	})
+}
+
+// PUT /api/private/directory/{id}
+func (h *PrivateHandler) UpdateDirectoryAlumni(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageDirectory(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola direktori alumni")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID alumni tidak valid")
+		return
+	}
+
+	var req struct {
+		FullName       *string `json:"full_name"`
+		BirthYear      *int16  `json:"birth_year"`
+		Email          *string `json:"email"`
+		PhotoURL       *string `json:"photo_url"`
+		City           *string `json:"city"`
+		JobTitle       *string `json:"job_title"`
+		Company        *string `json:"company"`
+		GraduationYear *int16  `json:"graduation_year"`
+		Major          *string `json:"major"`
+		LinkedinURL    *string `json:"linkedin_url"`
+		InstagramURL   *string `json:"instagram_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+
+	existingUser, err := h.queries.GetUserByID(r.Context(), id)
+	if err != nil {
+		util.WriteError(w, http.StatusNotFound, "Data alumni tidak ditemukan")
+		return
+	}
+	if existingUser.Role != db.UsersRoleAlumni {
+		util.WriteError(w, http.StatusBadRequest, "Hanya data user alumni yang dapat diubah")
+		return
+	}
+
+	newFullName := existingUser.FullName
+	if req.FullName != nil {
+		if strings.TrimSpace(*req.FullName) == "" {
+			util.WriteError(w, http.StatusBadRequest, "Nama tidak boleh kosong")
+			return
+		}
+		newFullName = strings.TrimSpace(*req.FullName)
+	}
+
+	newBirthYear := existingUser.BirthYear
+	if req.BirthYear != nil {
+		currentYear := int16(time.Now().Year() + 1)
+		if *req.BirthYear < 1940 || *req.BirthYear > currentYear {
+			util.WriteError(w, http.StatusBadRequest, "Tahun lahir tidak valid")
+			return
+		}
+		newBirthYear = *req.BirthYear
+	}
+
+	newEmail := existingUser.Email
+	if req.Email != nil {
+		if strings.TrimSpace(*req.Email) == "" {
+			util.WriteError(w, http.StatusBadRequest, "Email tidak boleh kosong")
+			return
+		}
+		newEmail = strings.ToLower(strings.TrimSpace(*req.Email))
+	}
+
+	if err := h.queries.UpdateAlumniUserByAdmin(r.Context(), db.UpdateAlumniUserByAdminParams{
+		FullName:  newFullName,
+		BirthYear: newBirthYear,
+		Email:     newEmail,
+		ID:        id,
+	}); err != nil {
+		if isDuplicateEmailErr(err) {
+			util.WriteError(w, http.StatusConflict, "Email sudah digunakan alumni lain")
+			return
+		}
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memperbarui data alumni")
+		return
+	}
+
+	if hasProfilePayload(req.PhotoURL, req.City, req.JobTitle, req.Company, req.GraduationYear, req.Major, req.LinkedinURL, req.InstagramURL) {
+		existingProfile, err := h.queries.GetOrCreateProfile(r.Context(), id)
+		if err != nil && err != sql.ErrNoRows {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil profil alumni")
+			return
+		}
+
+		photoURL := mergeOptionalString(existingProfile.PhotoUrl, req.PhotoURL)
+		phone := existingProfile.Phone
+		gradYear := mergeOptionalInt16(existingProfile.GraduationYear, req.GraduationYear)
+		major := mergeOptionalString(existingProfile.Major, req.Major)
+		city := mergeOptionalString(existingProfile.City, req.City)
+		jobTitle := mergeOptionalString(existingProfile.JobTitle, req.JobTitle)
+		company := mergeOptionalString(existingProfile.Company, req.Company)
+		bio := existingProfile.Bio
+		linkedinURL := mergeOptionalString(existingProfile.LinkedinUrl, req.LinkedinURL)
+		instagramURL := mergeOptionalString(existingProfile.InstagramUrl, req.InstagramURL)
+
+		if err := h.queries.UpsertProfile(r.Context(), db.UpsertProfileParams{
+			UserID:         id,
+			PhotoUrl:       photoURL,
+			Phone:          phone,
+			GraduationYear: gradYear,
+			Major:          major,
+			City:           city,
+			JobTitle:       jobTitle,
+			Company:        company,
+			Bio:            bio,
+			LinkedinUrl:    linkedinURL,
+			InstagramUrl:   instagramURL,
+		}); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal memperbarui profil alumni")
+			return
+		}
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "Data alumni berhasil diperbarui", nil)
+}
+
+// DELETE /api/private/directory/{id}
+func (h *PrivateHandler) DeleteDirectoryAlumni(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		util.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if !canManageDirectory(user) {
+		util.WriteError(w, http.StatusForbidden, "Anda tidak memiliki izin mengelola direktori alumni")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID alumni tidak valid")
+		return
+	}
+
+	existingUser, err := h.queries.GetUserByID(r.Context(), id)
+	if err != nil {
+		util.WriteError(w, http.StatusNotFound, "Data alumni tidak ditemukan")
+		return
+	}
+	if existingUser.Role != db.UsersRoleAlumni {
+		util.WriteError(w, http.StatusBadRequest, "Hanya data user alumni yang dapat dihapus")
+		return
+	}
+	if strings.EqualFold(existingUser.Email, privilegedManagerEmail) {
+		util.WriteError(w, http.StatusBadRequest, "Akun manager khusus tidak dapat dihapus")
+		return
+	}
+
+	if err := h.queries.DeleteAlumniUserByAdmin(r.Context(), id); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menghapus data alumni")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "Data alumni berhasil dihapus", nil)
 }
 
 // GET /api/private/jobs
@@ -559,6 +832,69 @@ func nullStringFromPtr(v *string) sql.NullString {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: *v, Valid: true}
+}
+
+func normalizeOptionalString(v *string) sql.NullString {
+	if v == nil {
+		return sql.NullString{}
+	}
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: trimmed, Valid: true}
+}
+
+func normalizeOptionalInt16(v *int16) sql.NullInt16 {
+	if v == nil || *v <= 0 {
+		return sql.NullInt16{}
+	}
+	return sql.NullInt16{Int16: *v, Valid: true}
+}
+
+func mergeOptionalString(existing sql.NullString, next *string) sql.NullString {
+	if next == nil {
+		return existing
+	}
+	return normalizeOptionalString(next)
+}
+
+func mergeOptionalInt16(existing sql.NullInt16, next *int16) sql.NullInt16 {
+	if next == nil {
+		return existing
+	}
+	return normalizeOptionalInt16(next)
+}
+
+func hasProfilePayload(photoURL, city, jobTitle, company *string, graduationYear *int16, major, linkedinURL, instagramURL *string) bool {
+	return photoURL != nil ||
+		city != nil ||
+		jobTitle != nil ||
+		company != nil ||
+		graduationYear != nil ||
+		major != nil ||
+		linkedinURL != nil ||
+		instagramURL != nil
+}
+
+func generateRandomPasswordHash() (string, error) {
+	seed, err := util.GenerateSecureToken()
+	if err != nil {
+		return "", err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(seed), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+func isDuplicateEmailErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "duplicate") && strings.Contains(errMsg, "email")
 }
 
 func boolToTinyInt(b bool) int {

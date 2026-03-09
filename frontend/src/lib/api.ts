@@ -135,8 +135,43 @@ export const privateApi = {
   getProfile: () => api.get("/api/private/profile"),
   updateProfile: (data: Record<string, unknown>) =>
     api.put("/api/private/profile", data),
+  uploadProfilePhoto: (file: File) => {
+    const formData = new FormData();
+    formData.append("photo", file);
+    return api.post("/api/private/upload/profile-photo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   getDirectory: (q = "", page = 1, limit = 12) =>
     api.get(`/api/private/directory?q=${q}&page=${page}&limit=${limit}`),
+  createDirectoryAlumni: (data: {
+    full_name: string;
+    birth_year: number;
+    email: string;
+    photo_url?: string;
+    city?: string;
+    job_title?: string;
+    company?: string;
+    graduation_year?: number;
+    major?: string;
+    linkedin_url?: string;
+    instagram_url?: string;
+  }) => api.post("/api/private/directory", data),
+  updateDirectoryAlumni: (id: string, data: {
+    full_name?: string;
+    birth_year?: number;
+    email?: string;
+    photo_url?: string;
+    city?: string;
+    job_title?: string;
+    company?: string;
+    graduation_year?: number;
+    major?: string;
+    linkedin_url?: string;
+    instagram_url?: string;
+  }) => api.put(`/api/private/directory/${id}`, data),
+  deleteDirectoryAlumni: (id: string) =>
+    api.delete(`/api/private/directory/${id}`),
   listNewsPrivate: (page = 1, limit = 10) =>
     api.get(`/api/private/news?page=${page}&limit=${limit}`),
   createNews: (data: {

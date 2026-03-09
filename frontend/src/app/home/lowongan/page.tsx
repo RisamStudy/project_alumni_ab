@@ -168,7 +168,7 @@ export default function LowonganPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Job Portal</h1>
           <p className="text-gray-500 text-sm mt-1">Akses lowongan pekerjaan khusus untuk alumni Al Bahjah.</p>
@@ -204,12 +204,15 @@ export default function LowonganPage() {
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => (
-            <div key={job.id} className="bg-white border rounded-xl p-5 flex items-center gap-4 hover:shadow-md transition">
+            <div
+              key={job.id}
+              className="bg-white border rounded-xl p-5 flex flex-col gap-4 sm:flex-row sm:items-center hover:shadow-md transition"
+            >
               <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
                 <Building2 size={22} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{job.title}</h3>
                     <p className="text-sm text-gray-500 mt-0.5">{job.company}</p>
@@ -261,7 +264,7 @@ export default function LowonganPage() {
                       })()}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end shrink-0">
                     <button
                       onClick={() => setDetailJob(job)}
                       className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"

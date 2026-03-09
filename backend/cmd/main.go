@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -88,11 +89,16 @@ func main() {
 	mux.HandleFunc("GET /api/public/news/{slug}", contentH.GetNews)
 	mux.HandleFunc("GET /api/public/events", contentH.ListEvents)
 	mux.HandleFunc("GET /api/public/events/{id}", contentH.GetEvent)
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(resolveUploadsRootDir()))))
 
 	// Private routes (JWT protected)
 	mux.Handle("GET /api/private/profile", jwtMiddleware(http.HandlerFunc(authH.GetProfile)))
 	mux.Handle("PUT /api/private/profile", jwtMiddleware(http.HandlerFunc(authH.UpdateProfile)))
+	mux.Handle("POST /api/private/upload/profile-photo", jwtMiddleware(http.HandlerFunc(authH.UploadProfilePhoto)))
 	mux.Handle("GET /api/private/directory", jwtMiddleware(http.HandlerFunc(privateH.ListDirectory)))
+	mux.Handle("POST /api/private/directory", jwtMiddleware(http.HandlerFunc(privateH.CreateDirectoryAlumni)))
+	mux.Handle("PUT /api/private/directory/{id}", jwtMiddleware(http.HandlerFunc(privateH.UpdateDirectoryAlumni)))
+	mux.Handle("DELETE /api/private/directory/{id}", jwtMiddleware(http.HandlerFunc(privateH.DeleteDirectoryAlumni)))
 	mux.Handle("GET /api/private/news", jwtMiddleware(http.HandlerFunc(privateH.ListNewsPrivate)))
 	mux.Handle("POST /api/private/news", jwtMiddleware(http.HandlerFunc(privateH.CreateNews)))
 	mux.Handle("PUT /api/private/news/{id}", jwtMiddleware(http.HandlerFunc(privateH.UpdateNews)))
@@ -126,4 +132,14 @@ func main() {
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
+}
+
+func resolveUploadsRootDir() string {
+	if _, err := os.Stat(filepath.Join("frontend", "public", "uploads")); err == nil {
+		return filepath.Join("frontend", "public", "uploads")
+	}
+	if _, err := os.Stat(filepath.Join("..", "frontend", "public", "uploads")); err == nil {
+		return filepath.Join("..", "frontend", "public", "uploads")
+	}
+	return "uploads"
 }

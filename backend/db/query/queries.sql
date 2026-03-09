@@ -34,6 +34,19 @@ LIMIT ? OFFSET ?;
 -- name: CountAlumni :one
 SELECT COUNT(*) FROM users WHERE status = 'active' AND role = 'alumni';
 
+-- name: CreateAlumniUserByAdmin :execresult
+INSERT INTO users (id, full_name, birth_year, email, password, status, role)
+VALUES (UUID(), ?, ?, ?, ?, 'active', 'alumni');
+
+-- name: UpdateAlumniUserByAdmin :exec
+UPDATE users
+SET full_name = ?, birth_year = ?, email = ?
+WHERE id = ? AND role = 'alumni';
+
+-- name: DeleteAlumniUserByAdmin :exec
+DELETE FROM users
+WHERE id = ? AND role = 'alumni';
+
 -- name: CreateEmailVerification :exec
 INSERT INTO email_verifications (id, user_id, token, expires_at)
 VALUES (UUID(), ?, ?, ?);

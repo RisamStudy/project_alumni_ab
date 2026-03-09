@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <body className={inter.className}>
+      <body className={`${inter.className} min-h-screen overflow-x-hidden`}>
         {children}
         <Toaster />
       </body>

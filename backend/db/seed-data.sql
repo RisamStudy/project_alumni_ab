@@ -3,6 +3,41 @@
 
 USE alumni_albahjah;
 
+-- -------------------------------------------------
+-- Akun default untuk testing login
+-- Admin:
+--   email    : admin@albahjah.test
+--   password : Admin12345!
+-- User biasa (alumni):
+--   email    : user@albahjah.test
+--   password : User12345!
+-- email admin: admin2@test.com 
+-- password admin (minimal 8 karakter): admin12345
+-- -------------------------------------------------
+INSERT INTO users (id, full_name, birth_year, email, password, status, role)
+VALUES
+  (UUID(), 'Admin Portal', 1990, 'admin@albahjah.test', '$2a$10$dl4bnam8VPnHLR0oEZOIw.0UU3BqGbz7wEvIw7QIWVNtYLWoDpO8m', 'active', 'admin'),
+  (UUID(), 'User Alumni', 2000, 'user@albahjah.test', '$2a$10$ooGiBv33MrmZPe7wQajKFevMcS9JyCOig1TVIUmhWkmv4PIJRG212', 'active', 'alumni')
+ON DUPLICATE KEY UPDATE
+  full_name = VALUES(full_name),
+  birth_year = VALUES(birth_year),
+  password = VALUES(password),
+  status = VALUES(status),
+  role = VALUES(role),
+  updated_at = CURRENT_TIMESTAMP;
+
+INSERT INTO profiles (user_id, city, major, graduation_year, job_title, company)
+SELECT id, 'Cirebon', 'Tahfidz', 2022, 'Staff Alumni', 'Yayasan Al Bahjah'
+FROM users
+WHERE email = 'user@albahjah.test'
+ON DUPLICATE KEY UPDATE
+  city = VALUES(city),
+  major = VALUES(major),
+  graduation_year = VALUES(graduation_year),
+  job_title = VALUES(job_title),
+  company = VALUES(company),
+  updated_at = CURRENT_TIMESTAMP;
+
 -- Insert dummy news (jika belum ada)
 INSERT IGNORE INTO news (id, title, slug, content, thumbnail, category, published, created_at)
 VALUES 
@@ -54,3 +89,4 @@ SELECT COUNT(*) AS total_news FROM news WHERE published = 1;
 SELECT COUNT(*) AS total_events FROM events WHERE published = 1;
 SELECT COUNT(*) AS total_jobs FROM jobs WHERE published = 1;
 SELECT COUNT(*) AS total_surveys FROM surveys WHERE active = 1;
+SELECT email, role, status FROM users WHERE email IN ('admin@albahjah.test', 'user@albahjah.test');

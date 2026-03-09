@@ -22,6 +22,27 @@ func (q *Queries) CountAlumni(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const createAlumniUserByAdmin = `-- name: CreateAlumniUserByAdmin :execresult
+INSERT INTO users (id, full_name, birth_year, email, password, status, role)
+VALUES (UUID(), ?, ?, ?, ?, 'active', 'alumni')
+`
+
+type CreateAlumniUserByAdminParams struct {
+	FullName  string `json:"full_name"`
+	BirthYear int16  `json:"birth_year"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+}
+
+func (q *Queries) CreateAlumniUserByAdmin(ctx context.Context, arg CreateAlumniUserByAdminParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createAlumniUserByAdmin,
+		arg.FullName,
+		arg.BirthYear,
+		arg.Email,
+		arg.Password,
+	)
+}
+
 const createEmailVerification = `-- name: CreateEmailVerification :exec
 INSERT INTO email_verifications (id, user_id, token, expires_at)
 VALUES (UUID(), ?, ?, ?)
@@ -228,6 +249,16 @@ DELETE FROM refresh_tokens WHERE user_id = ?
 
 func (q *Queries) DeleteAllUserRefreshTokens(ctx context.Context, userID string) error {
 	_, err := q.db.ExecContext(ctx, deleteAllUserRefreshTokens, userID)
+	return err
+}
+
+const deleteAlumniUserByAdmin = `-- name: DeleteAlumniUserByAdmin :exec
+DELETE FROM users
+WHERE id = ? AND role = 'alumni'
+`
+
+func (q *Queries) DeleteAlumniUserByAdmin(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteAlumniUserByAdmin, id)
 	return err
 }
 
@@ -1124,6 +1155,29 @@ UPDATE password_resets SET used = 1 WHERE token = ?
 
 func (q *Queries) MarkPasswordResetUsed(ctx context.Context, token string) error {
 	_, err := q.db.ExecContext(ctx, markPasswordResetUsed, token)
+	return err
+}
+
+const updateAlumniUserByAdmin = `-- name: UpdateAlumniUserByAdmin :exec
+UPDATE users
+SET full_name = ?, birth_year = ?, email = ?
+WHERE id = ? AND role = 'alumni'
+`
+
+type UpdateAlumniUserByAdminParams struct {
+	FullName  string `json:"full_name"`
+	BirthYear int16  `json:"birth_year"`
+	Email     string `json:"email"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) UpdateAlumniUserByAdmin(ctx context.Context, arg UpdateAlumniUserByAdminParams) error {
+	_, err := q.db.ExecContext(ctx, updateAlumniUserByAdmin,
+		arg.FullName,
+		arg.BirthYear,
+		arg.Email,
+		arg.ID,
+	)
 	return err
 }
 

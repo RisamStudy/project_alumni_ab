@@ -95,6 +95,7 @@ export interface Alumni {
   major?: string;
   linkedin_url?: string;
   instagram_url?: string;
+  can_manage?: boolean;
 }
 
 export interface ApiResponse<T> {

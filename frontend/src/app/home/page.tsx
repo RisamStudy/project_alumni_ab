@@ -262,16 +262,18 @@ export default function HomeDashboard() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between">
+    <div className="space-y-6 md:space-y-8 w-full max-w-full overflow-x-hidden">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ahlan wa Sahlan, {user?.full_name?.split(" ")[0]}!</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl break-words">
+            Ahlan wa Sahlan, {user?.full_name?.split(" ")[0]}!
+          </h1>
           <p className="text-gray-500 text-sm mt-1">Welcome back to your alumni community hub.</p>
         </div>
       </div>
 
       {completion < 100 && (
-        <div className="bg-white border rounded-xl p-5 flex items-center gap-4">
+        <div className="bg-white border rounded-xl p-4 sm:p-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
             <CheckCircle className="text-primary-500" size={20} />
           </div>
@@ -289,7 +291,7 @@ export default function HomeDashboard() {
           </div>
           <Link
             href="/home/profil"
-            className="bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-600 transition shrink-0"
+            className="bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-600 transition shrink-0 w-full text-center sm:w-auto"
           >
             Complete Profile
           </Link>
@@ -298,7 +300,7 @@ export default function HomeDashboard() {
 
       <section>
         <h2 className="font-semibold text-gray-900 mb-4">Quick Access</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
             { label: "News Feed", href: "/home", icon: Newspaper, tone: "text-sky-600 bg-sky-50" },
             { label: "Directory", href: "/home/direktori", icon: Users, tone: "text-emerald-600 bg-emerald-50" },
@@ -320,7 +322,7 @@ export default function HomeDashboard() {
         </div>
       </section>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid gap-6 xl:grid-cols-2">
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">Upcoming Events</h2>
@@ -342,7 +344,7 @@ export default function HomeDashboard() {
               : events.map((event) => {
                   const date = new Date(event.start_time);
                   return (
-                    <div key={event.id} className="bg-white border rounded-xl p-4 flex gap-4 items-center">
+                    <div key={event.id} className="bg-white border rounded-xl p-4 flex flex-col gap-3 sm:flex-row sm:gap-4 sm:items-center">
                       <div className="shrink-0 w-14 h-14 overflow-hidden rounded-lg bg-gray-100">
                         {event.thumbnail && <img src={event.thumbnail} alt="" className="w-full h-full object-cover" />}
                       </div>
@@ -353,16 +355,16 @@ export default function HomeDashboard() {
                         <h3 className="font-semibold text-gray-900 text-sm truncate">{event.title}</h3>
                         <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                           {event.location && (
-                            <span className="flex items-center gap-1">
-                              <MapPin size={10} />
-                              {event.location}
+                            <span className="flex items-center gap-1 min-w-0">
+                              <MapPin size={10} className="shrink-0" />
+                              <span className="truncate">{event.location}</span>
                             </span>
                           )}
                         </div>
                       </div>
                       <Link
                         href={`/home/event/${event.id}`}
-                        className="text-xs border border-primary-500 text-primary-500 px-3 py-1 rounded-lg hover:bg-primary-50 transition shrink-0"
+                        className="text-xs border border-primary-500 text-primary-500 px-3 py-1 rounded-lg hover:bg-primary-50 transition shrink-0 w-full text-center sm:w-auto"
                       >
                         Register
                       </Link>
@@ -391,13 +393,13 @@ export default function HomeDashboard() {
                   </div>
                 ))
               : jobs.map((job) => (
-                  <div key={job.id} className="p-4 flex items-center gap-3">
+                  <div key={job.id} className="p-4 flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                       <Briefcase size={16} className="text-slate-500" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{job.title}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-400 truncate">
                         {job.company} • {job.location || "Remote"}
                       </p>
                     </div>
@@ -415,12 +417,12 @@ export default function HomeDashboard() {
       </div>
 
       <section>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="font-semibold text-gray-900">Community News</h2>
           {canManageNews && (
             <button
               onClick={openCreateNewsModal}
-              className="bg-primary-500 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-primary-600 transition inline-flex items-center gap-2"
+              className="bg-primary-500 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-primary-600 hover:shadow-sm transition inline-flex items-center justify-center gap-2 w-full sm:w-auto"
             >
               <Plus size={14} />
               Tambah News
@@ -430,7 +432,7 @@ export default function HomeDashboard() {
 
         {newsError && <p className="mb-3 text-sm text-red-600">{newsError}</p>}
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {loading
             ? [1, 2, 3].map((i) => (
                 <div key={i} className="bg-white border rounded-xl overflow-hidden animate-pulse">
@@ -461,10 +463,10 @@ export default function HomeDashboard() {
                         )}
                       </div>
                       {item.can_manage && (
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
                           <button
                             onClick={() => openEditNewsModal(item)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition"
                           >
                             <Pencil size={12} />
                             Edit
@@ -472,7 +474,7 @@ export default function HomeDashboard() {
                           <button
                             onClick={() => handleDeleteNews(item.id)}
                             disabled={deletingNewsID === item.id}
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition disabled:opacity-60"
                           >
                             <Trash2 size={12} />
                             {deletingNewsID === item.id ? "..." : "Hapus"}
@@ -501,11 +503,15 @@ export default function HomeDashboard() {
       </section>
 
       {showNewsModal && (
-        <div className="fixed inset-0 z-40 bg-black/40 px-4 py-8 overflow-y-auto">
+        <div className="fixed inset-0 z-40 bg-black/40 px-3 py-4 sm:px-4 sm:py-8 overflow-y-auto">
           <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-xl border">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <h2 className="font-semibold text-gray-900">{editingNews ? "Edit News" : "Tambah News"}</h2>
-              <button onClick={() => setShowNewsModal(false)} className="text-gray-400 hover:text-gray-600" aria-label="Tutup">
+              <button
+                onClick={() => setShowNewsModal(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md p-1 transition"
+                aria-label="Tutup"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -562,7 +568,7 @@ export default function HomeDashboard() {
                         setNewsForm((prev) => ({ ...prev, thumbnail: "" }));
                         setNewsThumbnailName("");
                       }}
-                      className="text-xs text-rose-600 hover:underline"
+                      className="text-xs text-rose-600 hover:text-rose-700 hover:underline transition"
                     >
                       Hapus thumbnail
                     </button>
@@ -582,14 +588,18 @@ export default function HomeDashboard() {
 
               {newsError && <p className="text-sm text-red-600">{newsError}</p>}
 
-              <div className="pt-1 flex items-center justify-end gap-2">
-                <button type="button" onClick={() => setShowNewsModal(false)} className="px-4 py-2 text-sm rounded-lg border">
+              <div className="pt-1 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewsModal(false)}
+                  className="px-4 py-2 text-sm rounded-lg border w-full sm:w-auto hover:bg-gray-50 hover:border-gray-300 transition"
+                >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={savingNews}
-                  className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-60"
+                  className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-600 hover:shadow-sm transition disabled:opacity-60 w-full sm:w-auto"
                 >
                   {savingNews ? "Menyimpan..." : editingNews ? "Simpan Perubahan" : "Simpan"}
                 </button>
