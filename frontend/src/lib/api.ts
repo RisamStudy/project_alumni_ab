@@ -264,4 +264,29 @@ export const privateApi = {
     api.post(`/api/private/events/${eventId}/register`, { status }),
   getEventRegistration: (eventId: string) =>
     api.get(`/api/private/events/${eventId}/registration`),
+  getAdminMajorStats: () =>
+    api.get("/api/private/stats/admin-major"),
+  getMemberRegionStats: () =>
+    api.get("/api/private/stats/member-region"),
+  listAdmins: () =>
+    api.get("/api/private/admins"),
+  createAdmin: (data: {
+    full_name: string;
+    birth_year: number;
+    email: string;
+    password: string;
+    major?: string;
+    city?: string;
+  }) => api.post("/api/private/admins", data),
+  updateAdmin: (id: string, data: {
+    full_name?: string;
+    birth_year?: number;
+    email?: string;
+    password?: string;
+    major?: string;
+    city?: string;
+    status?: "unverified" | "active" | "suspended";
+  }) => api.put(`/api/private/admins/${id}`, data),
+  deleteAdmin: (id: string) =>
+    api.delete(`/api/private/admins/${id}`),
 };

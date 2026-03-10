@@ -259,11 +259,13 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-dark-900 border-t border-white/10 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-primary-500 rounded-full" />
+          <div className="flex items-center gap-2"> 
+            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center border">
+              <img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" />
+            </div>
             <span className="text-white font-medium">Alumni Al Bahjah</span>
           </div>
-          <span className="text-center">(c) 2024 Portal Alumni Al Bahjah. All rights reserved.</span>
+          <span className="text-center">(c) 2026 Portal Alumni Al Bahjah. All rights reserved.</span>
           <div className="flex flex-wrap justify-center gap-4">
             <Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>

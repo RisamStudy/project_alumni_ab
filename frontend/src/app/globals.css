@@ -29,9 +29,20 @@
 
 @layer base {
   * { @apply border-border; }
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans), "Segoe UI", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(16, 185, 129, 0.12), transparent 38%),
+      radial-gradient(circle at 84% 2%, rgba(6, 182, 212, 0.1), transparent 35%);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), var(--font-sans), "Segoe UI", sans-serif;
   }
 }
 

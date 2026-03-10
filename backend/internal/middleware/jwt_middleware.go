@@ -49,7 +49,7 @@ func JWTAuth(jwtSecret string) func(http.Handler) http.Handler {
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := r.Context().Value(UserContextKey).(*UserContext)
-		if !ok || user.Role != "admin" {
+		if !ok || (user.Role != "admin" && user.Role != "super_admin") {
 			util.WriteError(w, http.StatusForbidden, "Akses ditolak")
 			return
 		}

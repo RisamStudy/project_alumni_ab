@@ -6,9 +6,28 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/lib/api";
 import {
-  Newspaper, Users, CalendarDays, Briefcase, ClipboardList,
-  Bell, Settings, LogOut, Home, ChevronDown, Menu, X
+  Bell,
+  Briefcase,
+  CalendarDays,
+  ChevronDown,
+  ClipboardList,
+  Home,
+  LogOut,
+  Menu,
+  Newspaper,
+  Settings,
+  ShieldCheck,
+  Users,
+  X,
 } from "lucide-react";
+
+const navLinks = [
+  { href: "/home", label: "News", icon: Newspaper },
+  { href: "/home/direktori", label: "Directory", icon: Users },
+  { href: "/home/event", label: "Events", icon: CalendarDays },
+  { href: "/home/lowongan", label: "Jobs", icon: Briefcase },
+  { href: "/home/survei", label: "Surveys", icon: ClipboardList },
+];
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
@@ -19,14 +38,6 @@ const resolvePhotoURL = (url?: string) => {
   return url;
 };
 
-const navLinks = [
-  { href: "/home",           label: "News",      icon: Newspaper },
-  { href: "/home/direktori", label: "Directory", icon: Users },
-  { href: "/home/event",     label: "Events",    icon: CalendarDays },
-  { href: "/home/lowongan",  label: "Jobs",      icon: Briefcase },
-  { href: "/home/survei",    label: "Surveys",   icon: ClipboardList },
-];
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, logout } = useAuthStore();
   const pathname = usePathname();
@@ -36,61 +47,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    console.log("🔐 Dashboard layout - isAuthenticated:", isAuthenticated);
-    console.log("👤 User:", user);
-    
-    // Only redirect if definitely not authenticated
-    // Give time for zustand to hydrate from localStorage
     const timer = setTimeout(() => {
       if (!isAuthenticated) {
-        console.log("⚠️  Not authenticated, redirecting to login...");
         router.push("/login");
       }
-    }, 100);
-    
+    }, 120);
+
     return () => clearTimeout(timer);
   }, [isAuthenticated, router]);
 
   useEffect(() => {
-    setMobileMenuOpen(false);
-    setProfileMenuOpen(false);
-  }, [pathname]);
+    if (!profileMenuOpen) return;
 
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!profileMenuOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setProfileMenuOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [profileMenuOpen]);
-
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileMenuOpen(false);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+      }
     };
 
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, []);
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [profileMenuOpen]);
 
-  // Show loading while checking auth
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-emerald-50 to-cyan-100">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+          <p className="text-sm text-slate-600">Menyiapkan dashboard...</p>
         </div>
       </div>
     );
   }
 
+  const isSuperAdmin = user?.role === "super_admin";
+
   const handleLogout = async () => {
-    try { await authApi.logout(); } catch {}
+    try {
+      await authApi.logout();
+    } catch {}
+
     logout();
     setMobileMenuOpen(false);
     setProfileMenuOpen(false);
@@ -98,109 +104,90 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      {/* Navbar */}
-      <nav className="bg-white border-b sticky top-0 z-50 w-full overflow-visible">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-4 md:gap-6 h-16 min-w-0">
-          {/* Logo */}
-          <Link href="/home" className="flex items-center gap-2 shrink-0 min-w-0">
-            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white border border-primary-100">
-              <img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" />
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-slate-100 via-emerald-50/45 to-white">
+      <header className="sticky top-0 z-50 border-b border-white/70 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl min-w-0 items-center gap-4 px-4 sm:px-6">
+          <Link href="/home" className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-sm"><img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" /></div> 
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold leading-none text-slate-900 sm:text-sm">Portal Alumni</p>
+              <p className="hidden text-[10px] uppercase tracking-[0.18em] text-slate-500 sm:block">Al Bahjah</p>
             </div>
-            <span className="font-bold text-gray-900 text-sm hidden sm:inline">Alumni Al Bahjah</span>
           </Link>
 
-          {/* Search */}
-          <div className="hidden md:block flex-1 max-w-xs">
-            <input
-              type="search"
-              placeholder="Search alumni, events..."
-              className="w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50"
-            />
-          </div>
-
-          {/* Nav links */}
-          <div className="hidden md:flex items-center gap-1 ml-auto">
+          <nav className="ml-auto hidden min-w-0 items-center gap-1 lg:flex">
             {navLinks.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className={`px-3 py-2 text-sm rounded-lg transition ${
+                className={`rounded-lg px-3 py-2 text-sm transition ${
                   pathname === href
-                    ? "text-primary-600 bg-primary-50 font-medium"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
                 {label}
               </Link>
             ))}
-          </div>
+          </nav>
 
-          {/* Right actions */}
-          <div className="hidden md:flex items-center gap-2 shrink-0">
-            <Link
-              href="/home/notifikasi"
-              aria-label="Notifikasi"
-              title="Notifikasi"
-              className={`w-9 h-9 flex items-center justify-center rounded-lg relative transition ${
-                pathname === "/home/notifikasi"
-                  ? "bg-primary-50 text-primary-600"
-                  : "hover:bg-gray-100 text-gray-500"
-              }`}
-            >
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
-            <Link
-              href="/home/pengaturan"
-              aria-label="Pengaturan"
-              title="Pengaturan"
-              className={`w-9 h-9 flex items-center justify-center rounded-lg transition ${
-                pathname === "/home/pengaturan"
-                  ? "bg-primary-50 text-primary-600"
-                  : "hover:bg-gray-100 text-gray-500"
-              }`}
-            >
-              <Settings size={18} />
-            </Link>
-            {/* Profile dropdown */}
+          <div className="hidden items-center gap-2 lg:flex">
+            <button className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100">
+              <Bell size={17} />
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500" />
+            </button>
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100">
+              <Settings size={17} />
+            </button>
+
             <div ref={profileMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen((prev) => !prev)}
-                aria-label="Menu profil"
-                aria-expanded={profileMenuOpen}
-                className={`flex items-center gap-2 rounded-lg p-1.5 transition ${
-                  profileMenuOpen ? "bg-gray-100" : "hover:bg-gray-100"
-                }`}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 shadow-sm transition hover:bg-slate-50"
               >
-                <div className="w-8 h-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-700 text-sm font-medium overflow-hidden">
+                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-emerald-100 text-sm font-semibold text-emerald-700">
                   {user?.profile?.photo_url ? (
-                    <img src={resolvePhotoURL(user.profile.photo_url)} alt="" className="w-full h-full object-cover" />
+                    <img src={resolvePhotoURL(user.profile.photo_url)} alt="" className="h-full w-full object-cover" />
                   ) : (
                     user?.full_name?.charAt(0) || "A"
                   )}
                 </div>
-                <ChevronDown size={14} className={`text-gray-400 transition-transform ${profileMenuOpen ? "rotate-180" : ""}`} />
+                <div className="hidden text-left sm:block">
+                  <p className="max-w-[160px] truncate text-xs font-semibold text-slate-900">{user?.full_name}</p>
+                  <p className="max-w-[160px] truncate text-[11px] text-slate-500">{user?.email}</p>
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={`text-slate-400 transition-transform ${profileMenuOpen ? "rotate-180" : ""}`}
+                />
               </button>
+
               <div
-                className={`absolute z-[70] right-0 top-full mt-1 bg-white border rounded-xl shadow-lg py-1 w-44 transition-all ${
-                  profileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+                className={`absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-lg transition-all ${
+                  profileMenuOpen ? "visible opacity-100" : "invisible opacity-0"
                 }`}
               >
-                <div className="px-3 py-2 border-b">
-                  <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
-                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                <div className="border-b border-slate-100 px-3 py-2">
+                  <p className="text-xs font-semibold text-slate-900">{user?.role || "alumni"}</p>
+                  {isSuperAdmin && (
+                    <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] text-emerald-700">
+                      <ShieldCheck size={11} />
+                      Super Admin
+                    </p>
+                  )}
                 </div>
                 <Link
                   href="/home/profil"
                   onClick={() => setProfileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   <Home size={14} /> Profil Saya
                 </Link>
-                <button onClick={handleLogout}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50">
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                >
                   <LogOut size={14} /> Logout
                 </button>
               </div>
@@ -210,23 +197,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="md:hidden ml-auto w-10 h-10 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 inline-flex items-center justify-center transition shrink-0"
-            aria-label={mobileMenuOpen ? "Tutup menu navigasi" : "Buka menu navigasi"}
+            className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 lg:hidden"
+            aria-label={mobileMenuOpen ? "Tutup menu" : "Buka menu"}
             aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-nav-menu"
           >
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
 
         {mobileMenuOpen && (
-          <div id="mobile-nav-menu" className="md:hidden border-t bg-white px-4 pb-4 overflow-x-hidden">
+          <div className="border-t border-slate-200 bg-white px-4 pb-4 lg:hidden">
             <div className="pt-3">
-              <input
-                type="search"
-                placeholder="Search alumni, events..."
-                className="w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50"
-              />
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Navigasi</p>
             </div>
 
             <div className="mt-3 space-y-1">
@@ -235,10 +217,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={href}
                   href={href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition ${
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition ${
                     pathname === href
-                      ? "text-primary-600 bg-primary-50 font-medium"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   <Icon size={16} />
@@ -247,87 +229,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               ))}
             </div>
 
-            <div className="mt-4 border-t pt-3 space-y-1">
-              <Link
-                href="/home/notifikasi"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition ${
-                  pathname === "/home/notifikasi"
-                    ? "text-primary-600 bg-primary-50 font-medium"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <Bell size={16} />
-                Notifikasi
-              </Link>
-              <Link
-                href="/home/pengaturan"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition ${
-                  pathname === "/home/pengaturan"
-                    ? "text-primary-600 bg-primary-50 font-medium"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <Settings size={16} />
-                Pengaturan
-              </Link>
-              <Link
-                href="/home/profil"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg text-gray-600 hover:bg-gray-100 transition"
-              >
-                <Home size={16} />
-                Profil Saya
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-lg text-red-600 hover:bg-red-50 transition"
-              >
-                <LogOut size={16} />
-                Logout
-              </button>
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <p className="truncate text-sm font-semibold text-slate-900">{user?.full_name}</p>
+              <p className="truncate text-xs text-slate-500">{user?.email}</p>
+              {isSuperAdmin && (
+                <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] text-emerald-700">
+                  <ShieldCheck size={11} />
+                  Super Admin
+                </p>
+              )}
+
+              <div className="mt-3 space-y-1">
+                <Link
+                  href="/home/profil"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  <Home size={16} />
+                  Profil Saya
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-rose-600 hover:bg-rose-50"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         )}
-      </nav>
+      </header>
 
-      {/* Page content */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 overflow-x-hidden">
-        {children}
-      </main>
+      <main className="mx-auto max-w-7xl overflow-x-hidden px-4 py-8 sm:px-6">{children}</main>
 
-      {/* Footer */}
-      <footer className="border-t bg-white mt-12 overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid md:grid-cols-3 gap-8 text-sm">
+      <footer className="border-t border-slate-200 bg-white/90">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 text-sm sm:px-6 md:grid-cols-3">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 bg-primary-500 rounded-full" />
-              <span className="font-semibold text-gray-900">Alumni Al Bahjah</span>
+            <div className="mb-3 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white border border-primary-100">
+              <img src="/favicon.ico" alt="Logo Alumni Al Bahjah" className="w-full h-full object-contain" />
             </div>
-            <p className="text-gray-500 text-xs leading-relaxed">
-              Connecting the Al Bahjah family through shared memories, career growth, and lifelong learning opportunities.
+              <p className="font-semibold text-slate-900">Alumni Al Bahjah</p>
+            </div>
+            <p className="text-xs leading-relaxed text-slate-500">
+              Komunitas digital untuk memperkuat silaturahmi, karier, dan kolaborasi antar alumni.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Platform</h4>
+            <p className="mb-3 font-semibold text-slate-800">Akses Cepat</p>
             <div className="space-y-2">
-              {[["Directory", "/home/direktori"], ["Job Board", "/home/lowongan"], ["Event Calendar", "/home/event"]].map(([l, h]) => (
-                <Link key={h} href={h} className="block text-gray-500 hover:text-primary-500 transition text-xs">{l}</Link>
+              {[
+                ["Directory", "/home/direktori"],
+                ["Jobs", "/home/lowongan"],
+                ["Events", "/home/event"],
+              ].map(([label, href]) => (
+                <Link key={href} href={href} className="block text-xs text-slate-500 transition hover:text-emerald-600">
+                  {label}
+                </Link>
               ))}
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Contact</h4>
+            <p className="mb-3 font-semibold text-slate-800">Bantuan</p>
             <div className="space-y-2">
-              {[["Help Center", "/help"], ["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"]].map(([l, h]) => (
-                <Link key={h} href={h} className="block text-gray-500 hover:text-primary-500 transition text-xs">{l}</Link>
+              {[
+                ["Help Center", "/help"],
+                ["Privacy Policy", "/privacy"],
+                ["Terms", "/terms"],
+              ].map(([label, href]) => (
+                <Link key={href} href={href} className="block text-xs text-slate-500 transition hover:text-emerald-600">
+                  {label}
+                </Link>
               ))}
             </div>
           </div>
-        </div>
-        <div className="border-t text-center py-4 text-xs text-gray-400">
-          © 2026 Alumni Al Bahjah. All rights reserved.
         </div>
       </footer>
     </div>

@@ -13,6 +13,8 @@ USE alumni_albahjah;
 --   password : User12345!
 -- email admin: admin2@test.com 
 -- password admin (minimal 8 karakter): admin12345
+-- Masukkan email super admin: admin1@yayasan.com
+-- Masukkan password super admin (minimal 8 karakter): bismillah123
 -- -------------------------------------------------
 INSERT INTO users (id, full_name, birth_year, email, password, status, role)
 VALUES

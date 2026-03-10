@@ -4,20 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	db "alumni-albahjah/db/sqlc"
 	"alumni-albahjah/internal/middleware"
 	"alumni-albahjah/internal/util"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
 type PrivateHandler struct {
 	queries db.Querier
+	sqlDB   *sql.DB
 }
 
 const (
@@ -25,9 +26,11 @@ const (
 	maxNewsThumbnailBytes  = 60000
 )
 
-func NewPrivateHandler(queries db.Querier) *PrivateHandler {
-	return &PrivateHandler{queries: queries}
+func NewPrivateHandler(queries db.Querier, sqlDB *sql.DB) *PrivateHandler {
+	return &PrivateHandler{queries: queries, sqlDB: sqlDB}
 }
+
+const privilegedRegionalStatsEmail = "risamaarif@gmail.com"
 
 var allowedJobTypes = map[string]db.JobsJobType{
 	"full_time": db.JobsJobTypeFullTime,
@@ -71,7 +74,7 @@ func canManageJob(user *middleware.UserContext, job db.Job) bool {
 	if user == nil {
 		return false
 	}
-	if user.Role == "admin" {
+	if isAdminRole(user.Role) {
 		return true
 	}
 	if strings.EqualFold(user.Email, privilegedManagerEmail) {
@@ -84,40 +87,82 @@ func canManageEvent(user *middleware.UserContext, event db.Event) bool {
 	if user == nil {
 		return false
 	}
-	if user.Role == "admin" {
+	if isAdminRole(user.Role) {
 		return true
 	}
 	return event.AuthorID.Valid && event.AuthorID.String == user.UserID
 }
 
-func canManageSurveys(user *middleware.UserContext) bool {
+func isAdminRole(role string) bool {
+	return role == "admin" || role == "super_admin"
+}
+
+func isSuperAdminRole(role string) bool {
+	return role == "super_admin"
+}
+
+func isPrivilegedManager(user *middleware.UserContext) bool {
 	if user == nil {
 		return false
 	}
-	if user.Role == "admin" {
-		return true
-	}
-	return strings.EqualFold(user.Email, privilegedManagerEmail)
-}
-
-func canManageNews(user *middleware.UserContext) bool {
-	return canManageSurveys(user)
+	return strings.EqualFold(strings.TrimSpace(user.Email), privilegedManagerEmail)
 }
 
 func canManageDirectory(user *middleware.UserContext) bool {
-	return canManageSurveys(user)
+	if user == nil {
+		return false
+	}
+	if isAdminRole(user.Role) {
+		return true
+	}
+	return isPrivilegedManager(user)
 }
 
-var newsSlugSanitizer = regexp.MustCompile(`[^a-z0-9]+`)
+func canManageNews(user *middleware.UserContext) bool {
+	return canManageDirectory(user)
+}
+
+func canManageSurveys(user *middleware.UserContext) bool {
+	return canManageDirectory(user)
+}
+
+func canManageAdmins(user *middleware.UserContext) bool {
+	return user != nil && isSuperAdminRole(user.Role)
+}
+
+func canViewMemberRegionStats(user *middleware.UserContext) bool {
+	if user == nil {
+		return false
+	}
+	if isAdminRole(user.Role) {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(user.Email), privilegedRegionalStatsEmail)
+}
 
 func makeNewsSlug(title string) string {
-	base := strings.TrimSpace(strings.ToLower(title))
-	base = newsSlugSanitizer.ReplaceAllString(base, "-")
-	base = strings.Trim(base, "-")
-	if base == "" {
-		base = "news"
+	source := strings.TrimSpace(strings.ToLower(title))
+	var b strings.Builder
+	prevDash := false
+
+	for _, r := range source {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			prevDash = false
+			continue
+		}
+		if !prevDash {
+			b.WriteByte('-')
+			prevDash = true
+		}
 	}
-	return base + "-" + strconv.FormatInt(time.Now().Unix(), 10)
+
+	slug := strings.Trim(b.String(), "-")
+	if slug == "" {
+		slug = "news"
+	}
+
+	return slug + "-" + time.Now().Format("20060102150405")
 }
 
 // GET /api/private/directory
@@ -1152,7 +1197,7 @@ func (h *PrivateHandler) ListEventsPrivate(w http.ResponseWriter, r *http.Reques
 	}
 
 	limit, offset := parsePagination(r)
-	isAdmin := user.Role == "admin"
+	isAdmin := isAdminRole(user.Role)
 
 	events, err := h.queries.ListEventsPrivate(r.Context(), db.ListEventsPrivateParams{
 		AuthorID: sql.NullString{String: user.UserID, Valid: true},
@@ -1794,5 +1839,584 @@ func (h *PrivateHandler) GetEventRegistration(w http.ResponseWriter, r *http.Req
 	util.WriteSuccess(w, http.StatusOK, "", map[string]interface{}{
 		"registered": true,
 		"status":     string(reg.Status),
+	})
+}
+
+type distributionItem struct {
+	Label string `json:"label"`
+	Total int64  `json:"total"`
+}
+
+func (h *PrivateHandler) ensureSQLDB(w http.ResponseWriter) bool {
+	if h.sqlDB != nil {
+		return true
+	}
+	util.WriteError(w, http.StatusInternalServerError, "Koneksi database tidak tersedia")
+	return false
+}
+
+func optionalStringPtr(v sql.NullString) *string {
+	if !v.Valid {
+		return nil
+	}
+	s := strings.TrimSpace(v.String)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func toNullString(raw string) sql.NullString {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: value, Valid: true}
+}
+
+func nullStringValue(v sql.NullString) interface{} {
+	if !v.Valid {
+		return nil
+	}
+	return v.String
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func isSupportedStatus(status string) bool {
+	switch status {
+	case "unverified", "active", "suspended":
+		return true
+	default:
+		return false
+	}
+}
+
+// GET /api/private/admins
+func (h *PrivateHandler) ListAdminUsers(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureSQLDB(w) {
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if !canManageAdmins(user) {
+		util.WriteError(w, http.StatusForbidden, "Hanya super admin yang bisa mengelola admin")
+		return
+	}
+
+	rows, err := h.sqlDB.QueryContext(
+		r.Context(),
+		`SELECT u.id, u.full_name, u.birth_year, u.email, u.role, u.status, u.created_at, p.major, p.city
+		 FROM users u
+		 LEFT JOIN profiles p ON p.user_id = u.id
+		 WHERE u.role IN ('admin', 'super_admin')
+		 ORDER BY CASE u.role WHEN 'super_admin' THEN 0 ELSE 1 END, u.full_name ASC`,
+	)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil data admin")
+		return
+	}
+	defer rows.Close()
+
+	type AdminItem struct {
+		ID        string  `json:"id"`
+		FullName  string  `json:"full_name"`
+		BirthYear int16   `json:"birth_year"`
+		Email     string  `json:"email"`
+		Role      string  `json:"role"`
+		Status    string  `json:"status"`
+		Major     *string `json:"major"`
+		City      *string `json:"city"`
+		CreatedAt string  `json:"created_at"`
+	}
+
+	result := make([]AdminItem, 0)
+	for rows.Next() {
+		var item AdminItem
+		var createdAt time.Time
+		var major sql.NullString
+		var city sql.NullString
+		if err := rows.Scan(
+			&item.ID,
+			&item.FullName,
+			&item.BirthYear,
+			&item.Email,
+			&item.Role,
+			&item.Status,
+			&createdAt,
+			&major,
+			&city,
+		); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal membaca data admin")
+			return
+		}
+		item.Major = optionalStringPtr(major)
+		item.City = optionalStringPtr(city)
+		item.CreatedAt = createdAt.Format("2006-01-02T15:04:05Z07:00")
+		result = append(result, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membaca data admin")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "", map[string]interface{}{
+		"admins": result,
+		"total":  len(result),
+	})
+}
+
+// POST /api/private/admins
+func (h *PrivateHandler) CreateAdminUser(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureSQLDB(w) {
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if !canManageAdmins(user) {
+		util.WriteError(w, http.StatusForbidden, "Hanya super admin yang bisa menambah admin")
+		return
+	}
+
+	var req struct {
+		FullName  string `json:"full_name"`
+		BirthYear int16  `json:"birth_year"`
+		Email     string `json:"email"`
+		Password  string `json:"password"`
+		Major     string `json:"major"`
+		City      string `json:"city"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+
+	email := normalizeEmail(req.Email)
+	if strings.TrimSpace(req.FullName) == "" || req.BirthYear == 0 || email == "" || req.Password == "" {
+		util.WriteError(w, http.StatusBadRequest, "Nama, tahun lahir, email, dan password wajib diisi")
+		return
+	}
+	if len(req.Password) < 8 {
+		util.WriteError(w, http.StatusBadRequest, "Password minimal 8 karakter")
+		return
+	}
+
+	_, err := h.queries.GetUserByEmail(r.Context(), email)
+	if err == nil {
+		util.WriteError(w, http.StatusConflict, "Email sudah terdaftar")
+		return
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		util.WriteError(w, http.StatusInternalServerError, "Terjadi kesalahan server")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memproses password")
+		return
+	}
+
+	tx, err := h.sqlDB.BeginTx(r.Context(), nil)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memulai transaksi")
+		return
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(
+		r.Context(),
+		`INSERT INTO users (id, full_name, birth_year, email, password, status, role)
+		 VALUES (UUID(), ?, ?, ?, ?, 'active', 'admin')`,
+		strings.TrimSpace(req.FullName),
+		req.BirthYear,
+		email,
+		string(hash),
+	); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membuat akun admin")
+		return
+	}
+
+	var adminID string
+	if err := tx.QueryRowContext(r.Context(), `SELECT id FROM users WHERE email = ? LIMIT 1`, email).Scan(&adminID); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil data admin")
+		return
+	}
+
+	major := toNullString(req.Major)
+	city := toNullString(req.City)
+	if major.Valid || city.Valid {
+		if _, err := tx.ExecContext(
+			r.Context(),
+			`INSERT INTO profiles (user_id, major, city)
+			 VALUES (?, ?, ?)
+			 ON DUPLICATE KEY UPDATE
+			   major = VALUES(major),
+			   city = VALUES(city),
+			   updated_at = CURRENT_TIMESTAMP`,
+			adminID,
+			nullStringValue(major),
+			nullStringValue(city),
+		); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal menyimpan profil admin")
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menyimpan data admin")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusCreated, "Akun admin berhasil dibuat", map[string]interface{}{
+		"id": adminID,
+	})
+}
+
+// PUT /api/private/admins/{id}
+func (h *PrivateHandler) UpdateAdminUser(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureSQLDB(w) {
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if !canManageAdmins(user) {
+		util.WriteError(w, http.StatusForbidden, "Hanya super admin yang bisa mengubah admin")
+		return
+	}
+
+	adminID := r.PathValue("id")
+	if adminID == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID admin tidak valid")
+		return
+	}
+
+	var req struct {
+		FullName  *string `json:"full_name"`
+		BirthYear *int16  `json:"birth_year"`
+		Email     *string `json:"email"`
+		Password  *string `json:"password"`
+		Major     *string `json:"major"`
+		City      *string `json:"city"`
+		Status    *string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		util.WriteError(w, http.StatusBadRequest, "Format request tidak valid")
+		return
+	}
+
+	var current struct {
+		FullName  string
+		BirthYear int16
+		Email     string
+		Password  string
+		Status    string
+		Role      string
+	}
+	if err := h.sqlDB.QueryRowContext(
+		r.Context(),
+		`SELECT full_name, birth_year, email, password, status, role
+		 FROM users
+		 WHERE id = ?
+		 LIMIT 1`,
+		adminID,
+	).Scan(&current.FullName, &current.BirthYear, &current.Email, &current.Password, &current.Status, &current.Role); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			util.WriteError(w, http.StatusNotFound, "Akun admin tidak ditemukan")
+			return
+		}
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil data admin")
+		return
+	}
+
+	if current.Role != "admin" {
+		util.WriteError(w, http.StatusForbidden, "Hanya akun dengan role admin yang dapat diubah")
+		return
+	}
+
+	fullName := current.FullName
+	if req.FullName != nil {
+		next := strings.TrimSpace(*req.FullName)
+		if next == "" {
+			util.WriteError(w, http.StatusBadRequest, "Nama lengkap tidak boleh kosong")
+			return
+		}
+		fullName = next
+	}
+
+	birthYear := current.BirthYear
+	if req.BirthYear != nil {
+		if *req.BirthYear == 0 {
+			util.WriteError(w, http.StatusBadRequest, "Tahun lahir tidak valid")
+			return
+		}
+		birthYear = *req.BirthYear
+	}
+
+	email := current.Email
+	if req.Email != nil {
+		nextEmail := normalizeEmail(*req.Email)
+		if nextEmail == "" {
+			util.WriteError(w, http.StatusBadRequest, "Email tidak boleh kosong")
+			return
+		}
+
+		var existingID string
+		err := h.sqlDB.QueryRowContext(r.Context(), `SELECT id FROM users WHERE email = ? LIMIT 1`, nextEmail).Scan(&existingID)
+		if err == nil && existingID != adminID {
+			util.WriteError(w, http.StatusConflict, "Email sudah digunakan akun lain")
+			return
+		}
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal memeriksa email")
+			return
+		}
+
+		email = nextEmail
+	}
+
+	passwordHash := current.Password
+	if req.Password != nil {
+		if len(*req.Password) < 8 {
+			util.WriteError(w, http.StatusBadRequest, "Password minimal 8 karakter")
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal memproses password")
+			return
+		}
+		passwordHash = string(hash)
+	}
+
+	status := current.Status
+	if req.Status != nil {
+		nextStatus := strings.TrimSpace(*req.Status)
+		if !isSupportedStatus(nextStatus) {
+			util.WriteError(w, http.StatusBadRequest, "Status tidak valid")
+			return
+		}
+		status = nextStatus
+	}
+
+	tx, err := h.sqlDB.BeginTx(r.Context(), nil)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memulai transaksi")
+		return
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(
+		r.Context(),
+		`UPDATE users
+		 SET full_name = ?, birth_year = ?, email = ?, password = ?, status = ?
+		 WHERE id = ?`,
+		fullName,
+		birthYear,
+		email,
+		passwordHash,
+		status,
+		adminID,
+	); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal memperbarui akun admin")
+		return
+	}
+
+	if req.Major != nil || req.City != nil {
+		var currentMajor sql.NullString
+		var currentCity sql.NullString
+		err := tx.QueryRowContext(
+			r.Context(),
+			`SELECT major, city FROM profiles WHERE user_id = ? LIMIT 1`,
+			adminID,
+		).Scan(&currentMajor, &currentCity)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil profil admin")
+			return
+		}
+		if errors.Is(err, sql.ErrNoRows) {
+			currentMajor = sql.NullString{}
+			currentCity = sql.NullString{}
+		}
+
+		if req.Major != nil {
+			currentMajor = toNullString(*req.Major)
+		}
+		if req.City != nil {
+			currentCity = toNullString(*req.City)
+		}
+
+		if _, err := tx.ExecContext(
+			r.Context(),
+			`INSERT INTO profiles (user_id, major, city)
+			 VALUES (?, ?, ?)
+			 ON DUPLICATE KEY UPDATE
+			   major = VALUES(major),
+			   city = VALUES(city),
+			   updated_at = CURRENT_TIMESTAMP`,
+			adminID,
+			nullStringValue(currentMajor),
+			nullStringValue(currentCity),
+		); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal memperbarui profil admin")
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menyimpan perubahan admin")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "Akun admin berhasil diperbarui", nil)
+}
+
+// DELETE /api/private/admins/{id}
+func (h *PrivateHandler) DeleteAdminUser(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureSQLDB(w) {
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if !canManageAdmins(user) {
+		util.WriteError(w, http.StatusForbidden, "Hanya super admin yang bisa menghapus admin")
+		return
+	}
+
+	adminID := r.PathValue("id")
+	if adminID == "" {
+		util.WriteError(w, http.StatusBadRequest, "ID admin tidak valid")
+		return
+	}
+	if adminID == user.UserID {
+		util.WriteError(w, http.StatusBadRequest, "Super admin tidak dapat menghapus akun sendiri")
+		return
+	}
+
+	var role string
+	if err := h.sqlDB.QueryRowContext(
+		r.Context(),
+		`SELECT role FROM users WHERE id = ? LIMIT 1`,
+		adminID,
+	).Scan(&role); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			util.WriteError(w, http.StatusNotFound, "Akun admin tidak ditemukan")
+			return
+		}
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil data admin")
+		return
+	}
+
+	if role != "admin" {
+		util.WriteError(w, http.StatusForbidden, "Hanya akun dengan role admin yang dapat dihapus")
+		return
+	}
+
+	if _, err := h.sqlDB.ExecContext(r.Context(), `DELETE FROM users WHERE id = ?`, adminID); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal menghapus akun admin")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "Akun admin berhasil dihapus", nil)
+}
+
+// GET /api/private/stats/admin-major
+func (h *PrivateHandler) GetAdminMajorStats(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureSQLDB(w) {
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if !canManageAdmins(user) {
+		util.WriteError(w, http.StatusForbidden, "Hanya super admin yang dapat melihat statistik admin")
+		return
+	}
+
+	rows, err := h.sqlDB.QueryContext(
+		r.Context(),
+		`SELECT COALESCE(NULLIF(TRIM(p.major), ''), 'Belum diisi') AS major_label, COUNT(*) AS total
+		 FROM users u
+		 LEFT JOIN profiles p ON p.user_id = u.id
+		 WHERE u.status = 'active' AND u.role IN ('admin', 'super_admin')
+		 GROUP BY major_label
+		 ORDER BY total DESC, major_label ASC`,
+	)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil statistik admin")
+		return
+	}
+	defer rows.Close()
+
+	distribution := make([]distributionItem, 0)
+	var totalAdmins int64
+	for rows.Next() {
+		var item distributionItem
+		if err := rows.Scan(&item.Label, &item.Total); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal membaca statistik admin")
+			return
+		}
+		totalAdmins += item.Total
+		distribution = append(distribution, item)
+	}
+	if err := rows.Err(); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membaca statistik admin")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "", map[string]interface{}{
+		"distribution": distribution,
+		"total_admins": totalAdmins,
+	})
+}
+
+// GET /api/private/stats/member-region
+func (h *PrivateHandler) GetMemberRegionStats(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureSQLDB(w) {
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if !canViewMemberRegionStats(user) {
+		util.WriteError(w, http.StatusForbidden, "Akses statistik anggota ditolak")
+		return
+	}
+
+	rows, err := h.sqlDB.QueryContext(
+		r.Context(),
+		`SELECT COALESCE(NULLIF(TRIM(p.city), ''), 'Belum diisi') AS region_label, COUNT(*) AS total
+		 FROM users u
+		 LEFT JOIN profiles p ON p.user_id = u.id
+		 WHERE u.status = 'active' AND u.role = 'alumni'
+		 GROUP BY region_label
+		 ORDER BY total DESC, region_label ASC`,
+	)
+	if err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal mengambil statistik anggota")
+		return
+	}
+	defer rows.Close()
+
+	distribution := make([]distributionItem, 0)
+	var totalMembers int64
+	for rows.Next() {
+		var item distributionItem
+		if err := rows.Scan(&item.Label, &item.Total); err != nil {
+			util.WriteError(w, http.StatusInternalServerError, "Gagal membaca statistik anggota")
+			return
+		}
+		totalMembers += item.Total
+		distribution = append(distribution, item)
+	}
+	if err := rows.Err(); err != nil {
+		util.WriteError(w, http.StatusInternalServerError, "Gagal membaca statistik anggota")
+		return
+	}
+
+	util.WriteSuccess(w, http.StatusOK, "", map[string]interface{}{
+		"distribution":  distribution,
+		"total_members": totalMembers,
 	})
 }

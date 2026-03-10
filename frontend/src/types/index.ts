@@ -3,7 +3,7 @@ export interface User {
   full_name: string;
   birth_year: number;
   email: string;
-  role: "alumni" | "admin";
+  role: "alumni" | "admin" | "super_admin";
   profile_completion: number;
   profile?: Profile;
 }
@@ -107,4 +107,21 @@ export interface ApiResponse<T> {
 export interface LoginResponse {
   access_token: string;
   user: User;
+}
+
+export interface DistributionItem {
+  label: string;
+  total: number;
+}
+
+export interface AdminAccount {
+  id: string;
+  full_name: string;
+  birth_year: number;
+  email: string;
+  role: "admin" | "super_admin";
+  status: "unverified" | "active" | "suspended";
+  major?: string;
+  city?: string;
+  created_at: string;
 }

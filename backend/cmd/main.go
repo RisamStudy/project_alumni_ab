@@ -64,7 +64,7 @@ func main() {
 	// Handlers
 	authH := handler.NewAuthHandler(queries, jwtSecret, emailCfg)
 	contentH := handler.NewContentHandler(queries)
-	privateH := handler.NewPrivateHandler(queries)
+	privateH := handler.NewPrivateHandler(queries, sqlDB)
 	webhookH := handler.NewWebhookHandler()
 
 	jwtMiddleware := middleware.JWTAuth(jwtSecret)
@@ -119,6 +119,12 @@ func main() {
 	mux.Handle("DELETE /api/private/surveys/{id}", jwtMiddleware(http.HandlerFunc(privateH.DeleteSurvey)))
 	mux.Handle("POST /api/private/events/{id}/register", jwtMiddleware(http.HandlerFunc(privateH.RegisterEvent)))
 	mux.Handle("GET /api/private/events/{id}/registration", jwtMiddleware(http.HandlerFunc(privateH.GetEventRegistration)))
+	mux.Handle("GET /api/private/admins", jwtMiddleware(http.HandlerFunc(privateH.ListAdminUsers)))
+	mux.Handle("POST /api/private/admins", jwtMiddleware(http.HandlerFunc(privateH.CreateAdminUser)))
+	mux.Handle("PUT /api/private/admins/{id}", jwtMiddleware(http.HandlerFunc(privateH.UpdateAdminUser)))
+	mux.Handle("DELETE /api/private/admins/{id}", jwtMiddleware(http.HandlerFunc(privateH.DeleteAdminUser)))
+	mux.Handle("GET /api/private/stats/admin-major", jwtMiddleware(http.HandlerFunc(privateH.GetAdminMajorStats)))
+	mux.Handle("GET /api/private/stats/member-region", jwtMiddleware(http.HandlerFunc(privateH.GetMemberRegionStats)))
 
 	// Wrap with CORS
 	handler := middleware.CORS(mux)
