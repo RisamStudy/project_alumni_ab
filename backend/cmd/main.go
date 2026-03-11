@@ -19,10 +19,7 @@ import (
 )
 
 func main() {
-	// Load .env
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, reading from environment")
-	}
+	loadEnv()
 
 	// DB connection
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&loc=Local",
@@ -134,10 +131,21 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("✓ Server running on http://localhost:%s", port)
+	log.Printf("Server running on http://localhost:%s", port)
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
+}
+
+func loadEnv() {
+	paths := []string{".env", "cmd/.env", "../cmd/.env"}
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			log.Printf("Loaded environment from %s", path)
+			return
+		}
+	}
+	log.Println("No .env file found, reading from environment")
 }
 
 func resolveUploadsRootDir() string {
