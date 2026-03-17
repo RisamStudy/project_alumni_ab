@@ -11,7 +11,18 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        // Jangan cache static assets agar styling tidak hilang setelah deploy ulang
+        source: '/_next/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // Halaman HTML tetap no-cache
+        source: '/((?!_next/static).*)',
         headers: [
           {
             key: 'Cache-Control',

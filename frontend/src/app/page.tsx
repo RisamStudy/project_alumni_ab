@@ -63,7 +63,7 @@ export default function LandingPage() {
             </span>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-4">
               Selamat Datang di<br />Portal Alumni{" "}
-              <span className="text-primary-500">Al Bahjahsss</span>
+              <span className="text-primary-500">Al Bahjah</span>
             </h1>
             <p className="text-gray-500 mb-8 leading-relaxed text-sm sm:text-base">
               Wadah resmi untuk menjalin silaturahmi antar alumni, berbagi peluang karir,

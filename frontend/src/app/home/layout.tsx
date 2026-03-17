@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 
 const navLinks = [
-  { href: "/home", label: "News", icon: Newspaper },
+  { href: "/home", label: "Dashboard", icon: Home },
+  { href: "/home/berita", label: "Berita", icon: Newspaper },
   { href: "/home/direktori", label: "Directory", icon: Users },
   { href: "/home/event", label: "Events", icon: CalendarDays },
   { href: "/home/lowongan", label: "Jobs", icon: Briefcase },
@@ -289,6 +290,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="mb-3 font-semibold text-slate-800">Akses Cepat</p>
             <div className="space-y-2">
               {[
+                ["Berita", "/home/berita"],
                 ["Directory", "/home/direktori"],
                 ["Jobs", "/home/lowongan"],
                 ["Events", "/home/event"],

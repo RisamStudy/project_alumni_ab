@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 const privilegedRegionalStatsEmail = "risamaarif@gmail.com";
+const privilegedNewsManagerEmail = "risamaarif@gmail.com";
 
 const chartColors = [
   "#0f766e",
@@ -145,6 +146,10 @@ export default function HomeDashboard() {
 
   const completion = user?.profile_completion || 0;
   const isSuperAdmin = user?.role === "super_admin";
+  const canManageNews =
+    user?.role === "admin" ||
+    user?.role === "super_admin" ||
+    user?.email?.toLowerCase() === privilegedNewsManagerEmail;
   const canViewMemberRegionStats =
     user?.role === "admin" ||
     user?.role === "super_admin" ||
@@ -412,7 +417,7 @@ export default function HomeDashboard() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { label: "News", href: "/home", icon: Newspaper },
+            { label: "Berita", href: "/home/berita", icon: Newspaper },
             { label: "Direktori", href: "/home/direktori", icon: Users },
             { label: "Events", href: "/home/event", icon: CalendarDays },
             { label: "Lowongan", href: "/home/lowongan", icon: Briefcase },
@@ -622,8 +627,8 @@ export default function HomeDashboard() {
       <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-bold text-slate-900">Berita Komunitas</h2>
-            <Link href="/home" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline">
-              Refresh feed <ArrowRight size={12} />
+            <Link href="/home/berita" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline">
+              {canManageNews ? "Kelola berita" : "Lihat semua"} <ArrowRight size={12} />
             </Link>
           </div>
         <div className="grid gap-4 md:grid-cols-3">
