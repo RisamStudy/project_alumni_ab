@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.env
+.env.production
+seed-data.sql
+migrations/
+proxy/
